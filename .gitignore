@@ -1,0 +1,23 @@
+# Local config - never commit
+.env
+
+# Generated local TLS material - never commit private keys or certs.
+# Only certs/README.md is tracked.
+certs/*
+!certs/README.md
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# mise local overrides
+.mise.local.toml
+
+# Traefik ACME/TLS generated files
+acme.json
+
+# Optional local auth middleware - may contain htpasswd credentials
+dynamic/dashboard-auth.yml
+dynamic/*auth*.yml

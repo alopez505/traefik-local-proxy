@@ -1,0 +1,82 @@
+# =============================================================================
+#  mise - task runner for traefik-local-proxy.
+#  Install mise: https://mise.jdx.dev
+#  List tasks:   mise tasks
+# =============================================================================
+
+[tools]
+uv = "0.10.10"
+
+[tasks.up]
+description = "Start Traefik (creates proxy network if needed)"
+run = "docker compose up -d"
+
+[tasks.down]
+description = "Stop Traefik and remove the compose-owned proxy network"
+run = "docker compose down"
+
+[tasks.stop]
+description = "Stop Traefik while keeping the proxy network"
+run = "docker compose stop"
+
+[tasks.restart]
+description = "Restart Traefik (use 'up' to apply config/port changes)"
+run = "docker compose restart proxy"
+
+[tasks.logs]
+description = "Follow Traefik logs (Ctrl-C to exit)"
+run = "docker compose logs -f"
+
+[tasks.ps]
+description = "Show Traefik service status"
+run = "docker compose ps"
+
+[tasks.pull]
+description = "Pull a newer Traefik image and restart"
+run = "docker compose pull && docker compose up -d"
+
+[tasks.certs]
+description = "Generate local CA and wildcard cert (skips if already present)"
+run = "./scripts/generate-dev-certs.sh"
+
+[tasks.config]
+description = "Validate the rendered compose config"
+run = "docker compose config -q && echo 'Config OK'"
+
+[tasks.validate]
+description = "Full local gate: pre-commit hooks + all compose configs"
+run = """
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
+	echo 'Validation must run inside a git repository (.git missing). Clone the repo or run git init first.'
+	exit 1
+}
+uvx pre-commit==4.2.0 run --all-files &&
+docker compose --env-file .env.example config -q &&
+docker compose --env-file .env.example -f examples/whoami/docker-compose.yml config -q &&
+echo 'Validation OK'
+"""
+
+[tasks.network]
+description = "Show containers currently attached to proxy"
+run = """
+set -a
+[ -f .env ] && . ./.env
+set +a
+docker network inspect "${TRAEFIK_PROXY_NETWORK:-proxy}" --format '{{range .Containers}}{{println .Name}}{{end}}' 2>/dev/null || echo "${TRAEFIK_PROXY_NETWORK:-proxy} network not yet created (run: mise run up)"
+"""
+
+[tasks.demo]
+description = "Start whoami test service at https://demo.localtest.me"
+run = "docker compose --env-file .env -f examples/whoami/docker-compose.yml up -d"
+
+[tasks.demo-down]
+description = "Stop the whoami test service"
+run = "docker compose --env-file .env -f examples/whoami/docker-compose.yml down"
+
+[tasks.trust-ca]
+description = "Import dev CA into Windows CurrentUser trust store (WSL2 -> Windows, no admin required)"
+run = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/trust-ca-windows.ps1"
+
+[tasks.untrust-ca]
+description = "Remove dev CA from Windows CurrentUser trust store"
+run = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/untrust-ca-windows.ps1"

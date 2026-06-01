@@ -1,0 +1,108 @@
+# =============================================================================
+#  Traefik local reverse proxy
+# -----------------------------------------------------------------------------
+#  HTTPS-first local proxy for Docker development on *.localtest.me.
+#  localtest.me is a public wildcard DNS that resolves to 127.0.0.1, so
+#  browsers reach Traefik running in WSL2 without /etc/hosts changes.
+#
+#  First-time setup:
+#    cp .env.example .env              # review ports and version
+#    mise run certs                    # generate local CA + wildcard cert
+#    mise run trust-ca                 # import CA into Windows CurrentUser trust store
+#    mise run up                       # start Traefik
+#    mise run demo                     # start demo service
+#    # Dashboard: https://proxy.localtest.me
+#
+#  Services that want Traefik routing join the shared proxy network:
+#    networks:
+#      proxy:
+#        external: true
+#        name: ${TRAEFIK_PROXY_NETWORK:-proxy}
+#    labels:
+#      traefik.enable: "true"
+#      traefik.hostname: "myapp"
+#      traefik.http.routers.myapp.entrypoints: "websecure"
+#      traefik.http.routers.myapp.tls: "true"
+#      traefik.http.services.myapp.loadbalancer.server.port: "<container_port>"
+# =============================================================================
+
+services:
+  proxy:
+    image: traefik:${TRAEFIK_VERSION:-v3.7.1}
+    container_name: traefik-local
+    restart: unless-stopped
+    # Static config lives in traefik.yml; CLI flags override individual settings.
+    command:
+      - "--configfile=/etc/traefik/traefik.yml"
+      # LOG_LEVEL is documented in .env.example and wired here (YAML config
+      # does not expand ${...}, CLI flags do).
+      - "--log.level=${TRAEFIK_LOG_LEVEL:-INFO}"
+      # Route Docker discovery through socket-proxy instead of mounting the
+      # Docker socket into Traefik.
+      - "--providers.docker.endpoint=tcp://socket-proxy:2375"
+      # Keep Traefik's Docker provider network in sync with the compose network.
+      - "--providers.docker.network=${TRAEFIK_PROXY_NETWORK:-proxy}"
+    depends_on:
+      - socket-proxy
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.proxy.rule: "Host(`proxy.localtest.me`)"
+      traefik.http.routers.proxy.entrypoints: "websecure"
+      traefik.http.routers.proxy.tls: "true"
+      traefik.http.routers.proxy.service: "api@internal"
+    ports:
+      # All ports bound to loopback - never exposed on the LAN.
+      - "127.0.0.1:${TRAEFIK_HTTP_PORT:-80}:80"
+      - "127.0.0.1:${TRAEFIK_HTTPS_PORT:-443}:443"
+      # Optional TCP entrypoints - uncomment only if you route database
+      # containers through this proxy. These ports conflict with local database
+      # installs (Neo4j, SQL Server, MySQL, Postgres); leave them commented
+      # unless you need them.
+      # - "127.0.0.1:${TRAEFIK_NEO4J_PORT:-7687}:7687"
+      # - "127.0.0.1:${TRAEFIK_MSSQL_PORT:-1433}:1433"
+      # - "127.0.0.1:${TRAEFIK_MYSQL_PORT:-3306}:3306"
+      # - "127.0.0.1:${TRAEFIK_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # Static Traefik config
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      # Dynamic config (TLS certificates, extra routers)
+      - ./dynamic:/etc/traefik/dynamic:ro
+      # Generated TLS material - see scripts/generate-dev-certs.sh
+      - ./certs:/etc/traefik/certs:ro
+    networks:
+      - proxy
+      - socket-proxy-net
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  socket-proxy:
+    image: ghcr.io/tecnativa/docker-socket-proxy:${SOCKET_PROXY_VERSION:-v0.4.2}
+    container_name: traefik-socket-proxy
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      NETWORKS: 1
+      SERVICES: 1
+      POST: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - socket-proxy-net
+
+networks:
+  # proxy is created and owned by this compose project.
+  # Other services reference it as an external network:
+  #   networks:
+  #     proxy:
+  #       external: true
+  #       name: ${TRAEFIK_PROXY_NETWORK:-proxy}
+  proxy:
+    name: ${TRAEFIK_PROXY_NETWORK:-proxy}
+
+  # Internal-only network between Traefik and socket-proxy.
+  socket-proxy-net:
+    internal: true

@@ -1,0 +1,9 @@
+tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /etc/traefik/certs/localtest.me.crt
+        keyFile: /etc/traefik/certs/localtest.me.key
+  certificates:
+    - certFile: /etc/traefik/certs/localtest.me.crt
+      keyFile: /etc/traefik/certs/localtest.me.key

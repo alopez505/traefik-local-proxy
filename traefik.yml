@@ -1,0 +1,61 @@
+# =============================================================================
+#  Traefik static configuration
+#  Loaded via docker-compose.yml: --configfile=/etc/traefik/traefik.yml
+# =============================================================================
+
+api:
+  dashboard: true
+  # Dashboard is served only via the TLS route defined in docker-compose.yml.
+  # Do not set insecure: true - that would open the dashboard on a plain port.
+  insecure: false
+
+# Liveness probe - used by the compose healthcheck.
+ping: {}
+
+log:
+  level: INFO
+
+accessLog: {}
+
+providers:
+  docker:
+    exposedByDefault: false
+    allowEmptyServices: true
+    # Generate the Host() rule from the traefik.hostname label so consumer
+    # projects only need one label instead of a full Host() expression.
+    defaultRule: 'Host(`{{ index .Labels "traefik.hostname" }}.localtest.me`)'
+  file:
+    # Dynamic config (TLS certs) is hot-reloaded from this directory.
+    directory: /etc/traefik/dynamic
+    watch: true
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+
+  websecure:
+    address: ":443"
+    http:
+      tls: {}
+
+  # Optional TCP entrypoints for database containers routed through this proxy.
+  # Comment out any entrypoint you do not use, and comment out the matching
+  # ports: line in docker-compose.yml if the host port conflicts with a local
+  # database install.
+  neo4j:
+    address: ":7687"
+
+  mssql:
+    address: ":1433"
+
+  mysql:
+    address: ":3306"
+
+  postgres:
+    address: ":5432"

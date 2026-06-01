@@ -1,0 +1,39 @@
+name: CI
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Install ShellCheck
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck
+
+      - name: ShellCheck
+        run: shellcheck scripts/*.sh
+
+      - name: Compose config (base)
+        run: docker compose --env-file .env.example config -q
+
+      - name: Compose config (whoami example)
+        run: docker compose --env-file .env.example -f examples/whoami/docker-compose.yml config -q
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.30.0/gitleaks_8.30.0_linux_x64.tar.gz \
+            | sudo tar -xz -C /usr/local/bin gitleaks
+
+      - name: Secret scan
+        run: gitleaks detect --source . --verbose --redact
