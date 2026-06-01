@@ -11,10 +11,9 @@ CA_CRT="$CERT_DIR/ca.crt"
 CA_KEY="$CERT_DIR/ca.key"
 CSR="$CERT_DIR/${DOMAIN}.csr"
 CONF="$(mktemp)"
-CA_EXT="$(mktemp)"
 
 cleanup() {
-  rm -f "$CSR" "$CERT_DIR/ca.srl" "$CONF" "$CA_EXT"
+  rm -f "$CSR" "$CERT_DIR/ca.srl" "$CONF"
 }
 
 trap cleanup EXIT
@@ -67,21 +66,13 @@ DNS.3 = localhost
 IP.1  = 127.0.0.1
 EOF
 
-# ---------------------------------------------------------------------------
-# OpenSSL extensions for the CA certificate (needed for browser trust)
-# ---------------------------------------------------------------------------
-cat > "$CA_EXT" <<EOF
-[ca_ext]
-basicConstraints = critical,CA:TRUE
-keyUsage         = critical,keyCertSign,cRLSign
-subjectKeyIdentifier = hash
-EOF
-
 echo "Generating local development CA (2-year validity)..."
 openssl genrsa -out "$CA_KEY" 2048 >/dev/null 2>&1
 openssl req -x509 -new -nodes -key "$CA_KEY" -sha256 -days 730 \
   -subj "/C=${CERT_COUNTRY:-US}/ST=${CERT_STATE:-CA}/L=${CERT_LOCALITY:-Local}/O=${CERT_ORG:-Local Development}/OU=${CERT_OU:-Traefik Local Proxy}/CN=${CERT_CA_CN:-Traefik Local Proxy Dev CA}" \
-  -extensions ca_ext -extfile "$CA_EXT" \
+  -addext "basicConstraints = critical,CA:TRUE" \
+  -addext "keyUsage = critical,keyCertSign,cRLSign" \
+  -addext "subjectKeyIdentifier = hash" \
   -out "$CA_CRT" >/dev/null 2>&1
 
 echo "Generating wildcard server certificate for ${DOMAIN} (825-day validity)..."
