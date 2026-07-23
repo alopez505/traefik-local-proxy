@@ -206,7 +206,7 @@ mise run network    # list containers currently on proxy
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `TRAEFIK_VERSION` | `v3.7.1` | Traefik image tag |
+| `TRAEFIK_VERSION` | `v3.7.8` | Traefik image tag |
 | `TRAEFIK_PROXY_NETWORK` | `proxy` | Shared Docker network name |
 | `TRAEFIK_HTTP_PORT` | `80` | Host HTTP port (bound to 127.0.0.1; redirects to HTTPS) |
 | `TRAEFIK_HTTPS_PORT` | `443` | Host HTTPS port (bound to 127.0.0.1) |

@@ -28,7 +28,7 @@
 
 services:
   proxy:
-    image: traefik:${TRAEFIK_VERSION:-v3.7.1}
+    image: traefik:${TRAEFIK_VERSION:-v3.7.8}
     container_name: traefik-local
     restart: unless-stopped
     # Static config lives in traefik.yml; CLI flags override individual settings.
