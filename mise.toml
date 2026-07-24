@@ -37,13 +37,34 @@ run = "docker compose logs -f"
 description = "Show Traefik service status"
 run = "docker compose ps"
 
-[tasks.pull]
-description = "Pull a newer Traefik image and restart"
+[tasks.update]
+description = "Pull images and apply the HTTPS proxy configuration"
 run = "docker compose pull && docker compose up -d"
+
+[tasks.update-http]
+description = "Pull images and apply the HTTP-only proxy configuration"
+run = "docker compose -f docker-compose.http.yml pull && docker compose -f docker-compose.http.yml up -d"
 
 [tasks.certs]
 description = "Generate wildcard cert via mkcert (skips if already present)"
 run = "./scripts/generate-dev-certs.sh"
+
+[tasks.replace-ca]
+description = "Untrust the old Windows CA, replace it, and trust the current mkcert CA"
+run = """
+CAROOT="$(mkcert -CAROOT)"
+if [ ! -f certs/ca.crt ]; then
+	echo 'certs/ca.crt is missing; there is no stored CA to rotate.' >&2
+	exit 1
+fi
+if [ -f "$CAROOT/rootCA.pem" ] && cmp -s certs/ca.crt "$CAROOT/rootCA.pem"; then
+	echo 'certs/ca.crt already matches the current mkcert CA; rotation is unnecessary.' >&2
+	exit 1
+fi
+mise run untrust-ca &&
+./scripts/generate-dev-certs.sh --replace-ca &&
+mise run trust-ca
+"""
 
 [tasks.config]
 description = "Validate the rendered compose config"
@@ -61,6 +82,7 @@ docker compose --env-file .env.example config -q &&
 docker compose --env-file .env.example -f docker-compose.http.yml config -q &&
 docker compose --env-file .env.example -f examples/whoami/docker-compose.yml config -q &&
 docker compose --env-file .env.example -f examples/whoami/docker-compose.http.yml config -q &&
+./scripts/test-generate-dev-certs.sh &&
 echo 'Validation OK'
 """
 
@@ -75,15 +97,19 @@ docker network inspect "${TRAEFIK_PROXY_NETWORK:-proxy}" --format '{{range .Cont
 
 [tasks.demo]
 description = "Start whoami test service at https://demo.localtest.me"
-run = "docker compose --env-file .env -f examples/whoami/docker-compose.yml up -d"
+run = "docker compose -f examples/whoami/docker-compose.yml up -d"
 
 [tasks.demo-http]
 description = "Start whoami test service at http://demo.localtest.me"
-run = "docker compose --env-file .env -f examples/whoami/docker-compose.http.yml up -d"
+run = "docker compose -f examples/whoami/docker-compose.http.yml up -d"
 
 [tasks.demo-down]
 description = "Stop the whoami test service"
-run = "docker compose --env-file .env -f examples/whoami/docker-compose.yml down"
+run = "docker compose -f examples/whoami/docker-compose.yml down"
+
+[tasks.smoke]
+description = "Run live HTTPS/HTTP mode-transition and custom-port smoke tests"
+run = "./scripts/smoke-test.sh"
 
 [tasks.trust-ca]
 description = "Import dev CA into Windows CurrentUser trust store (WSL2 -> Windows, no admin required)"

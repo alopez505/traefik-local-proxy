@@ -2,7 +2,9 @@ version: 2
 
 updates:
   - package-ecosystem: "docker-compose"
-    directory: "/"
+    directories:
+      - "/"
+      - "/examples/whoami"
     schedule:
       interval: "weekly"
 

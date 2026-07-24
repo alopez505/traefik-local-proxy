@@ -4,14 +4,23 @@
 
 services:
   proxy:
-    image: traefik:${TRAEFIK_VERSION:-v3.7.8}
+    image: traefik:v3.7.8
     container_name: traefik-local
     restart: unless-stopped
     command:
-      - "--configfile=/etc/traefik/traefik.yml"
+      - "--global.sendanonymoususage=false"
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+      - "--ping=true"
       - "--log.level=${TRAEFIK_LOG_LEVEL:-INFO}"
+      - "--accesslog=true"
+      - "--providers.docker=true"
       - "--providers.docker.endpoint=tcp://socket-proxy:2375"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.allowemptyservices=true"
+      - '--providers.docker.defaultrule=Host(`{{ index .Labels "traefik.hostname" }}.localtest.me`)'
       - "--providers.docker.network=${TRAEFIK_PROXY_NETWORK:-proxy}"
+      - "--entrypoints.web.address=:80"
     depends_on:
       - socket-proxy
     labels:
@@ -22,8 +31,6 @@ services:
       traefik.http.routers.proxy.service: "api@internal"
     ports:
       - "127.0.0.1:${TRAEFIK_HTTP_PORT:-80}:80"
-    volumes:
-      - ./traefik.http.yml:/etc/traefik/traefik.yml:ro
     networks:
       - proxy
       - socket-proxy-net
@@ -35,13 +42,12 @@ services:
       start_period: 5s
 
   socket-proxy:
-    image: ghcr.io/tecnativa/docker-socket-proxy:${SOCKET_PROXY_VERSION:-v0.4.2}
+    image: ghcr.io/tecnativa/docker-socket-proxy:v0.4.2
     container_name: traefik-socket-proxy
     restart: unless-stopped
     environment:
       CONTAINERS: 1
       NETWORKS: 1
-      SERVICES: 1
       POST: 0
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
