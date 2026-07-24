@@ -13,6 +13,10 @@ mkcert = "1.4.4"
 description = "Start Traefik (creates proxy network if needed)"
 run = "docker compose up -d"
 
+[tasks.up-http]
+description = "Start Traefik without local TLS certificates"
+run = "docker compose -f docker-compose.http.yml up -d"
+
 [tasks.down]
 description = "Stop Traefik and remove the compose-owned proxy network"
 run = "docker compose down"
@@ -54,7 +58,9 @@ git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
 }
 uvx pre-commit==4.2.0 run --all-files &&
 docker compose --env-file .env.example config -q &&
+docker compose --env-file .env.example -f docker-compose.http.yml config -q &&
 docker compose --env-file .env.example -f examples/whoami/docker-compose.yml config -q &&
+docker compose --env-file .env.example -f examples/whoami/docker-compose.http.yml config -q &&
 echo 'Validation OK'
 """
 
@@ -70,6 +76,10 @@ docker network inspect "${TRAEFIK_PROXY_NETWORK:-proxy}" --format '{{range .Cont
 [tasks.demo]
 description = "Start whoami test service at https://demo.localtest.me"
 run = "docker compose --env-file .env -f examples/whoami/docker-compose.yml up -d"
+
+[tasks.demo-http]
+description = "Start whoami test service at http://demo.localtest.me"
+run = "docker compose --env-file .env -f examples/whoami/docker-compose.http.yml up -d"
 
 [tasks.demo-down]
 description = "Stop the whoami test service"

@@ -14,6 +14,12 @@ utilities.
 
 ## Quick start
 
+Prerequisites: Docker Engine with Compose and `mise`. Choose one startup mode.
+The HTTPS mode is the default and is closest to production; the HTTP mode does
+not generate certificates or modify the Windows trust store.
+
+### HTTPS mode (default)
+
 ```bash
 mise install            # install pinned tools (mkcert, uv)
 cp .env.example .env    # review ports and Traefik version
@@ -31,6 +37,32 @@ which is pinned in `mise.toml` and installed by `mise install`. mkcert keeps its
 CA in its own CAROOT outside the repo; `mise run trust-ca` then imports the CA
 certificate into the Windows trust store so Windows browsers trust the HTTPS
 that Traefik serves from WSL2.
+
+### HTTP-only mode
+
+Installing a local root CA may not be allowed on a work-managed device. TLS is
+optional: after `mise install` and copying `.env`, run `mise run up-http`. Do
+not run `mise run certs` or `mise run trust-ca`. This mode does not mount
+`certs/` or load the dynamic TLS configuration, and serves the dashboard at
+<http://proxy.localtest.me>.
+
+HTTP-only mode is intended for local development where browser HTTPS behavior
+is not required. Services used with it should route through the `web`
+entrypoint and omit the `tls` label. The existing HTTPS setup remains the
+default and is unchanged.
+
+### Switching modes
+
+The two modes use the same Compose project, container names, network, and host
+ports. Running `mise run up-http` while HTTPS is running, or `mise run up` while
+HTTP is running, causes Compose to recreate the proxy with the selected config;
+you do not need to remove certificates or rebuild anything. The certificate
+files and Windows trust entry remain on the machine but are unused in HTTP mode.
+
+The proxy switches automatically, but routed application containers do not
+change their labels. Use `mise run demo-http` for the HTTP demo, or update an
+application's router from `websecure` plus `tls: "true"` to `web` without the
+TLS label. Switch those labels back when returning to HTTPS.
 
 ---
 
@@ -198,6 +230,7 @@ below. `mise run validate` is fully self-contained - no system-level
 
 ```text
 mise run up         # start Traefik + create proxy network
+mise run up-http    # start Traefik without local TLS certificates
 mise run stop       # stop Traefik, keep proxy network
 mise run down       # stop Traefik and remove proxy if no other containers use it
 mise run restart    # restart Traefik process; use up to apply config changes
@@ -208,6 +241,7 @@ mise run certs      # generate the wildcard cert via mkcert (skips if already pr
 mise run trust-ca   # import CA into Windows CurrentUser trust store (WSL2 → Windows)
 mise run untrust-ca # remove dev CA from Windows CurrentUser trust store
 mise run demo       # start whoami test service at https://demo.localtest.me
+mise run demo-http  # start whoami test service at http://demo.localtest.me
 mise run demo-down  # stop the whoami test service
 mise run config     # validate docker-compose.yml
 mise run validate   # run pre-commit hooks + validate all compose configs
@@ -222,7 +256,7 @@ mise run network    # list containers currently on proxy
 | --- | --- | --- |
 | `TRAEFIK_VERSION` | `v3.7.8` | Traefik image tag |
 | `TRAEFIK_PROXY_NETWORK` | `proxy` | Shared Docker network name |
-| `TRAEFIK_HTTP_PORT` | `80` | Host HTTP port (bound to 127.0.0.1; redirects to HTTPS) |
+| `TRAEFIK_HTTP_PORT` | `80` | Host HTTP port (bound to 127.0.0.1; redirects to HTTPS in HTTPS mode) |
 | `TRAEFIK_HTTPS_PORT` | `443` | Host HTTPS port (bound to 127.0.0.1) |
 | `TRAEFIK_NEO4J_PORT` | `7687` | Neo4j TCP entrypoint (loopback-only) |
 | `TRAEFIK_MSSQL_PORT` | `1433` | MSSQL TCP entrypoint (loopback-only) |
@@ -253,6 +287,9 @@ proxy. Those ports commonly conflict with local database installs.
 
 Traefik static configuration lives in [`traefik.yml`](./traefik.yml).
 Dynamic configuration (TLS material) lives in [`dynamic/tls.yml`](./dynamic/tls.yml).
+HTTP-only mode uses [`traefik.http.yml`](./traefik.http.yml) and the standalone
+[`docker-compose.http.yml`](./docker-compose.http.yml); it has no `websecure`
+entrypoint, HTTPS port, or certificate mount.
 
 Key settings in `traefik.yml`:
 
