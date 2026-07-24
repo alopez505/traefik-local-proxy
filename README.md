@@ -14,9 +14,14 @@ utilities.
 
 ## Quick start
 
-Prerequisites: Docker Engine with Compose and `mise`. Choose one startup mode.
+Prerequisites: Docker Engine with Compose v2 and `mise`. Windows PowerShell
+must be accessible from WSL2 when using the Windows trust-store task. Choose
+one startup mode.
 The HTTPS mode is the default and is closest to production; the HTTP mode does
 not generate certificates or modify the Windows trust store.
+
+`mise install` installs `mkcert` `1.4.4` and `uv` `0.10.10`. The validation task
+uses `uvx pre-commit==4.2.0`; `uv` is otherwise only needed for that task.
 
 ### HTTPS mode (default)
 
@@ -70,10 +75,15 @@ TLS label. Switch those labels back when returning to HTTPS.
 
 ```mermaid
 flowchart LR
-  Browser -->|"https://myapp.localtest.me"| T["Traefik :443<br/>proxy"]
-  T -->|"HTTP :80 → :443 redirect"| T
-  T -->|"label-based routing"| A["myapp container<br/>proxy"]
-  T -->|"label-based routing"| B["demo container<br/>proxy"]
+  Browser["Browser"] -->|"localtest.me wildcard DNS<br/>127.0.0.1"| T["Traefik<br/>web :80 / websecure :443"]
+  CA["Windows user trust store"] -. "trusts mkcert CA" .-> Browser
+  Browser -->|"http://myapp.localtest.me :80"| W["Traefik web :80"]
+  W -->|"permanent HTTPS redirect"| T
+  TLS["dynamic/tls.yml<br/>+ certs/"] -->|"TLS certificate"| T
+  T -->|"filtered Docker API"| S["socket-proxy"]
+  S -->|"read-only discovery"| D["Docker Engine<br/>/var/run/docker.sock"]
+  T -->|"label-based routing<br/>over shared proxy network"| A["myapp container"]
+  T -->|"label-based routing<br/>over shared proxy network"| B["demo container"]
 ```
 
 Traefik watches Docker through the local socket-proxy service for containers that:
@@ -89,9 +99,14 @@ It automatically picks them up - no restart required.
 ## What is localtest.me
 
 `localtest.me` is a public wildcard DNS domain that resolves every subdomain to
-`127.0.0.1`. It is not an IETF standard like `localhost` - it is a convenience
-domain run by a third party. It works because the record is public:
+loopback. Its commonly used IPv4 record is `127.0.0.1`. It is not an IETF
+standard like `localhost` - it is a convenience domain run by a third party.
+It works because the record is public:
 `*.localtest.me IN A 127.0.0.1`.
+
+This stack publishes Docker ports on IPv4 `127.0.0.1` only. Some resolvers also
+return IPv6 `::1`; if a browser selects IPv6 first and the request fails, use an
+IPv4-preferred resolver or configure Docker to publish the ports on IPv6 too.
 
 Why use it instead of `*.localhost`?
 
@@ -122,6 +137,10 @@ See the DNS-privacy note in the Certificate setup section below.
 
    This invokes `scripts/trust-ca-windows.ps1`, which imports into
    `Cert:\CurrentUser\Root`. To remove it later: `mise run untrust-ca`.
+
+  > **Important:** `mise run untrust-ca` removes every root certificate whose
+  > subject matches `*mkcert*` from this Windows user's trust store. That can
+  > affect other mkcert-based projects, not only this repository.
 
     mkcert sets a browser-compatible validity on the leaf and a long-lived CA.
     Because `--force` normally reuses the same mkcert CA, you do not need to
@@ -262,10 +281,15 @@ mise run network    # list containers currently on proxy
 | `TRAEFIK_MSSQL_PORT` | `1433` | MSSQL TCP entrypoint (loopback-only) |
 | `TRAEFIK_MYSQL_PORT` | `3306` | MySQL TCP entrypoint (loopback-only) |
 | `TRAEFIK_POSTGRES_PORT` | `5432` | Postgres TCP entrypoint (loopback-only) |
+| `SOCKET_PROXY_VERSION` | `v0.4.2` | Docker socket proxy image tag |
 | `TRAEFIK_LOG_LEVEL` | `INFO` | Log verbosity: DEBUG, INFO, WARN, ERROR |
 
 Override in `.env`. Keep `TRAEFIK_VERSION` pinned to a specific patch release
 for reproducibility.
+
+The proxy uses `traefik:${TRAEFIK_VERSION}` and
+`ghcr.io/tecnativa/docker-socket-proxy:${SOCKET_PROXY_VERSION}`. The optional
+whoami demo uses the fixed `traefik/whoami:v1.10` image.
 
 The TCP database ports conflict with local installs of MSSQL, MySQL, and
 Postgres. Comment out the relevant `ports:` lines in `docker-compose.yml` if
@@ -281,6 +305,31 @@ in `docker-compose.yml` are commented out by default**. Uncomment only the
 ports you need and only when you are routing database containers through this
 proxy. Those ports commonly conflict with local database installs.
 
+For example, to route a Postgres container, uncomment the Postgres host-port
+binding in `docker-compose.yml`, then add these labels to the database service:
+
+```yaml
+services:
+  postgres:
+    networks:
+      - proxy
+    labels:
+      traefik.enable: "true"
+      traefik.tcp.routers.postgres.entrypoints: "postgres"
+      traefik.tcp.routers.postgres.rule: "HostSNI(`*`)"
+      traefik.tcp.services.postgres.loadbalancer.server.port: "5432"
+
+networks:
+  proxy:
+    external: true
+    name: ${TRAEFIK_PROXY_NETWORK:-proxy}
+```
+
+Connect the client to `127.0.0.1:${TRAEFIK_POSTGRES_PORT:-5432}`. Repeat the
+pattern with the matching entrypoint and container port for the other database
+types. This is raw TCP forwarding; TLS, authentication, and encryption remain
+the responsibility of the database protocol and client.
+
 ---
 
 ## Static config
@@ -290,6 +339,13 @@ Dynamic configuration (TLS material) lives in [`dynamic/tls.yml`](./dynamic/tls.
 HTTP-only mode uses [`traefik.http.yml`](./traefik.http.yml) and the standalone
 [`docker-compose.http.yml`](./docker-compose.http.yml); it has no `websecure`
 entrypoint, HTTPS port, or certificate mount.
+
+The HTTPS Compose file mounts `dynamic/` read-only and Traefik watches it for
+hot reloads. Files placed there are loaded as dynamic Traefik configuration;
+use container paths such as `/etc/traefik/certs/localtest.me.crt` when referring
+to mounted files. The checked-in `tls.yml` expects the exact generated names
+`localtest.me.crt` and `localtest.me.key`. HTTP-only mode does not mount or load
+this directory.
 
 Key settings in `traefik.yml`:
 
