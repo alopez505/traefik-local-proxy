@@ -26,8 +26,14 @@ jobs:
       - name: Compose config (base)
         run: docker compose --env-file .env.example config -q
 
-      - name: Compose config (whoami example)
+      - name: Compose config (HTTP-only base)
+        run: docker compose --env-file .env.example -f docker-compose.http.yml config -q
+
+      - name: Compose config (HTTPS whoami example)
         run: docker compose --env-file .env.example -f examples/whoami/docker-compose.yml config -q
+
+      - name: Compose config (HTTP-only whoami example)
+        run: docker compose --env-file .env.example -f examples/whoami/docker-compose.http.yml config -q
 
   secret-scan:
     runs-on: ubuntu-latest
