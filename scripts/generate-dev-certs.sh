@@ -16,11 +16,11 @@ KEY="$CERT_DIR/localtest.me.key"
 CA_CRT="$CERT_DIR/ca.crt"
 
 usage() {
-  cat <<'EOF'
+  cat <<EOF
 Usage: generate-dev-certs.sh [--force | --replace-ca]
 
   --force       Regenerate the leaf certificate using the same mkcert CA.
-  --replace-ca  Replace certs/ca.crt after the old CA has been untrusted.
+  --replace-ca  Replace $CA_CRT after the old CA has been untrusted.
                 Prefer the guarded workflow: mise run replace-ca
 EOF
 }
@@ -77,7 +77,7 @@ if [[ -f "$CA_CRT" ]]; then
 fi
 
 if [[ "$CA_MISMATCH" -eq 1 && "$REPLACE_CA" -eq 0 ]]; then
-  echo "Error: certs/ca.crt does not match mkcert's current root CA." >&2
+  echo "Error: $CA_CRT does not match mkcert's current root CA." >&2
   echo "Refusing to overwrite the old CA certificate, including with --force," >&2
   echo "because it is needed to remove the exact old root from trust stores." >&2
   echo >&2
@@ -87,13 +87,13 @@ if [[ "$CA_MISMATCH" -eq 1 && "$REPLACE_CA" -eq 0 ]]; then
 fi
 
 if [[ "$REPLACE_CA" -eq 1 && "$CA_MISMATCH" -eq 0 ]]; then
-  echo "Error: certs/ca.crt already matches mkcert's current root CA." >&2
+  echo "Error: $CA_CRT already matches mkcert's current root CA." >&2
   echo "Use --force if you only want to regenerate the leaf certificate." >&2
   exit 1
 fi
 
 if [[ -f "$CRT" && -f "$KEY" && -f "$CA_CRT" && "$FORCE" -eq 0 ]]; then
-  echo "Certificates already exist in certs/. Use --force to regenerate the leaf."
+  echo "Certificates already exist in $CERT_DIR. Use --force to regenerate the leaf."
   exit 0
 fi
 
@@ -117,14 +117,16 @@ chmod 600 "$KEY" 2>/dev/null || true
 chmod 644 "$CRT" "$CA_CRT" 2>/dev/null || true
 
 echo "Created:"
-echo "  certs/localtest.me.crt (wildcard leaf, mkcert-signed)"
-echo "  certs/localtest.me.key (leaf private key - keep local, do not share)"
-echo "  certs/ca.crt          (mkcert root CA - import into Windows trust store)"
+echo "  $CRT (wildcard leaf, mkcert-signed)"
+echo "  $KEY (leaf private key - keep local, do not share)"
+echo "  $CA_CRT (mkcert root CA - import into a trust store)"
 echo
 echo "mkcert CAROOT (holds the CA and its private key): $CAROOT"
-echo
-echo "Next step: run 'mise run trust-ca' to import certs/ca.crt into Windows"
-echo "CurrentUser\\Root (no admin required) so Windows browsers trust HTTPS from WSL2."
+if [[ "$CERT_DIR" == "$ROOT_DIR/certs" ]]; then
+  echo
+  echo "Next step: run 'mise run trust-ca' to import $CA_CRT into Windows"
+  echo "CurrentUser\\Root (no admin required) so Windows browsers trust HTTPS from WSL2."
+fi
 echo "Optional, to also trust HTTPS from inside WSL (curl, etc.): mkcert -install"
 echo
 echo "Note: on a managed/corporate device, confirm that installing a custom"
