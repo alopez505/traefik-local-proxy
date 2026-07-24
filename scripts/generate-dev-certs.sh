@@ -3,9 +3,10 @@ set -euo pipefail
 
 # Generate the local development TLS material with mkcert.
 #
-# mkcert manages a local CA in its CAROOT (outside this repo) and signs a
-# wildcard leaf for localtest.me. The CA private key never enters the repo;
-# only the leaf cert/key and a copy of the CA certificate land in certs/.
+# mkcert manages a local CA in its CAROOT (outside this repo) and signs a leaf
+# covering localtest.me, *.localtest.me, localhost, and the loopback IPs. The
+# CA private key never enters the repo; only the leaf cert/key and a copy of the
+# CA certificate land in certs/.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CERT_DIR="$ROOT_DIR/certs"
