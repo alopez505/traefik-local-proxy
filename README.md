@@ -27,7 +27,7 @@ uses `uvx pre-commit==4.2.0`; `uv` is otherwise only needed for that task.
 
 ```bash
 mise install            # install pinned tools (mkcert, uv)
-cp .env.example .env    # review ports and Traefik version
+cp .env.example .env    # optional: override ports, network name, or log level
 mise run certs          # generate the wildcard cert via mkcert (skips if present)
 mise run trust-ca       # import the CA into Windows CurrentUser\Root (WSL2 -> Windows)
 mise run up             # start Traefik
@@ -46,10 +46,10 @@ that Traefik serves from WSL2.
 ### HTTP-only mode
 
 Installing a local root CA may not be allowed on a work-managed device. TLS is
-optional: after `mise install` and copying `.env`, run `mise run up-http`. Do
-not run `mise run certs` or `mise run trust-ca`. This mode does not mount
-`certs/` or load the dynamic TLS configuration, and serves the dashboard at
-<http://proxy.localtest.me>.
+optional: run `mise run up-http` without generating or trusting certificates.
+Copying `.env.example` to `.env` is optional in both modes. HTTP mode does not
+mount certificate files or load the dynamic TLS configuration, and serves the
+dashboard at <http://proxy.localtest.me>.
 
 HTTP-only mode is intended for local development where browser HTTPS behavior
 is not required. Services used with it should route through the `web`
@@ -63,6 +63,8 @@ ports. Running `mise run up-http` while HTTPS is running, or `mise run up` while
 HTTP is running, causes Compose to recreate the proxy with the selected config;
 you do not need to remove certificates or rebuild anything. The certificate
 files and Windows trust entry remain on the machine but are unused in HTTP mode.
+HTTPS mode uses temporary redirects so browsers do not retain a permanent
+HTTP-to-HTTPS redirect after the proxy switches back to HTTP.
 
 The proxy switches automatically, but routed application containers do not
 change their labels. Use `mise run demo-http` for the HTTP demo, or update an
@@ -73,17 +75,40 @@ TLS label. Switch those labels back when returning to HTTPS.
 
 ## How it works
 
+Two views: how a browser request reaches your container, and how Traefik
+discovers containers and loads its configuration.
+
+### Request flow
+
 ```mermaid
 flowchart LR
-  Browser["Browser"] -->|"localtest.me wildcard DNS<br/>127.0.0.1"| T["Traefik<br/>web :80 / websecure :443"]
-  CA["Windows user trust store"] -. "trusts mkcert CA" .-> Browser
-  Browser -->|"http://myapp.localtest.me :80"| W["Traefik web :80"]
-  W -->|"permanent HTTPS redirect"| T
-  TLS["dynamic/tls.yml<br/>+ certs/"] -->|"TLS certificate"| T
-  T -->|"filtered Docker API"| S["socket-proxy"]
-  S -->|"read-only discovery"| D["Docker Engine<br/>/var/run/docker.sock"]
-  T -->|"label-based routing<br/>over shared proxy network"| A["myapp container"]
-  T -->|"label-based routing<br/>over shared proxy network"| B["demo container"]
+  Browser -->|"http://myapp.localtest.me"| W["Traefik<br/>web :80"]
+  W -->|"temporary HTTPS redirect"| SEC["Traefik<br/>websecure :443"]
+  Browser -->|"https://myapp.localtest.me"| SEC
+  CA["Windows trust store<br/>(mkcert CA)"] -. trusts .-> Browser
+  TLS["dynamic/tls.yml<br/>+ leaf certificate and key"] -->|"TLS configuration"| SEC
+  SEC -->|"label-based routing<br/>over the proxy network"| A["myapp container"]
+  SEC -->|"label-based routing<br/>over the proxy network"| B["demo container"]
+```
+
+`*.localtest.me` resolves to `127.0.0.1`, so the browser reaches Traefik in
+WSL2 with no `/etc/hosts` edits. HTTP is redirected to HTTPS; the certificate
+and key are mounted as exact files and served via `dynamic/tls.yml`. The
+certificate is trusted because the mkcert CA is in the Windows trust store.
+HTTP-only mode skips the redirect and TLS; any existing certificate files and
+Windows trust entry remain present but unused.
+
+### Container discovery & configuration
+
+```mermaid
+flowchart LR
+  Static["docker-compose.yml<br/>install configuration"] --> T["Traefik"]
+  Dyn["dynamic/tls.yml<br/>hot-reloaded"] --> T
+  Certs["certs/<br/>leaf certificate + key"] --> Dyn
+  CACopy["certs/ca.crt<br/>CA copy"] -->|"mise run trust-ca"| Trust["Windows trust store"]
+  T -->|"filtered Docker API<br/>tcp://socket-proxy:2375"| S["socket-proxy"]
+  S <-->|"read-only Docker API<br/>/var/run/docker.sock"| D["Docker Engine"]
+  S -->|"container metadata<br/>labels, networks, events"| T
 ```
 
 Traefik watches Docker through the local socket-proxy service for containers that:
@@ -125,7 +150,8 @@ See the DNS-privacy note in the Certificate setup section below.
 
    ```bash
    ./scripts/generate-dev-certs.sh
-   # Use --force to regenerate the leaf (reuses the existing mkcert CA)
+   # Regenerate only the leaf while keeping the same CA:
+   ./scripts/generate-dev-certs.sh --force
    ```
 
 2. Import `certs/ca.crt` into the Windows trust store - **no admin required**:
@@ -137,16 +163,28 @@ See the DNS-privacy note in the Certificate setup section below.
    This invokes `scripts/trust-ca-windows.ps1`, which imports into
    `Cert:\CurrentUser\Root`. To remove it later: `mise run untrust-ca`.
 
-  > **Important:** `mise run untrust-ca` removes every root certificate whose
-  > subject matches `*mkcert*` from this Windows user's trust store. That can
-  > affect other mkcert-based projects, not only this repository.
+> **Important:** `mise run untrust-ca` removes only the root certificate that
+> matches `certs/ca.crt`. mkcert normally shares one CA across projects for a
+> user profile, so other projects using that same CA will stop trusting it.
 
-    mkcert sets a browser-compatible validity on the leaf and a long-lived CA.
-    Because `--force` normally reuses the same mkcert CA, you do not need to
-    re-run `mise run trust-ca` after regenerating the leaf. If mkcert's CA was
-    changed or reset, import the new CA again after regeneration.
+Because `--force` reuses the same mkcert CA, you do not need to re-run
+`mise run trust-ca` after regenerating the leaf. If mkcert's CAROOT changes or
+its CA is reset, the generator refuses to overwrite `certs/ca.crt`—even with
+`--force`—because that file is required to identify the exact old trusted root.
+Use the guarded rotation workflow instead:
 
-3. Start Traefik and open <https://proxy.localtest.me>.
+```bash
+mise run replace-ca
+```
+
+It removes the old CA from Windows `CurrentUser\Root`, verifies the removal,
+replaces the staged CA and leaf, then trusts the new CA. The task manages only
+that Windows store. If you separately installed the old CA in WSL, Firefox/NSS,
+Java, or another trust store, remove it there before rotating it. If the old CA
+cannot be removed, preserve `certs/ca.crt`; do not discard the only exact
+identifier for the trusted root.
+
+Then start Traefik and open <https://proxy.localtest.me>.
 
 > **Work / managed devices:** Installing a custom root CA may be against your
 > IT policy and can trigger endpoint security tooling. Confirm it is allowed
@@ -184,7 +222,8 @@ services:
       traefik.hostname: "myapp"   # routes https://myapp.localtest.me
       traefik.http.routers.myapp.entrypoints: "websecure"
       traefik.http.routers.myapp.tls: "true"
-      # Only needed if the container exposes multiple ports:
+      # Required if no backend port can be inferred or several are exposed.
+      # Keeping it explicit also makes examples portable:
       traefik.http.services.myapp.loadbalancer.server.port: "8000"
 
 networks:
@@ -247,24 +286,31 @@ below. `mise run validate` is fully self-contained - no system-level
 `pre-commit` or `shellcheck` install required.
 
 ```text
-mise run up         # start Traefik + create proxy network
-mise run up-http    # start Traefik without local TLS certificates
-mise run stop       # stop Traefik, keep proxy network
-mise run down       # stop Traefik and remove proxy if no other containers use it
-mise run restart    # restart Traefik process; use up to apply config changes
-mise run logs       # follow Traefik logs
-mise run ps         # show service status
-mise run pull       # pull newer image + restart
-mise run certs      # generate the wildcard cert via mkcert (skips if already present)
-mise run trust-ca   # import CA into Windows CurrentUser trust store (WSL2 → Windows)
-mise run untrust-ca # remove dev CA from Windows CurrentUser trust store
-mise run demo       # start whoami test service at https://demo.localtest.me
-mise run demo-http  # start whoami test service at http://demo.localtest.me
-mise run demo-down  # stop the whoami test service
-mise run config     # validate docker-compose.yml
-mise run validate   # run pre-commit hooks + validate all compose configs
-mise run network    # list containers currently on proxy
+mise run up          # start Traefik + create proxy network
+mise run up-http     # start Traefik without local TLS certificates
+mise run stop        # stop Traefik, keep proxy network
+mise run down        # stop Traefik and remove proxy if no other containers use it
+mise run restart     # restart Traefik process; use up to apply config changes
+mise run logs        # follow Traefik logs
+mise run ps          # show service status
+mise run update      # pull images + apply the HTTPS configuration
+mise run update-http # pull images + apply the HTTP-only configuration
+mise run certs       # generate the wildcard cert via mkcert (skips if already present)
+mise run replace-ca  # untrust old Windows CA, replace it, and trust the new CA
+mise run trust-ca    # import CA into Windows CurrentUser trust store (WSL2 → Windows)
+mise run untrust-ca  # remove dev CA from Windows CurrentUser trust store
+mise run demo        # start whoami test service at https://demo.localtest.me
+mise run demo-http   # start whoami test service at http://demo.localtest.me
+mise run demo-down   # stop the whoami test service
+mise run config      # validate docker-compose.yml
+mise run validate    # run pre-commit hooks + validate all compose configs
+mise run smoke       # live HTTPS/HTTP transition and custom-port checks
+mise run network     # list containers currently on proxy
 ```
+
+The smoke task uses loopback ports `18080`/`18443`, a disposable network, and
+cleans up afterward. It refuses to run while the normal proxy or demo
+containers exist.
 
 ---
 
@@ -272,23 +318,23 @@ mise run network    # list containers currently on proxy
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `TRAEFIK_VERSION` | `v3.7.8` | Traefik image tag |
 | `TRAEFIK_PROXY_NETWORK` | `proxy` | Shared Docker network name |
 | `TRAEFIK_HTTP_PORT` | `80` | Host HTTP port (bound to 127.0.0.1; redirects to HTTPS in HTTPS mode) |
-| `TRAEFIK_HTTPS_PORT` | `443` | Host HTTPS port (bound to 127.0.0.1) |
+| `TRAEFIK_HTTPS_PORT` | `443` | Host HTTPS port (bound to 127.0.0.1 and included in redirects) |
 | `TRAEFIK_NEO4J_PORT` | `7687` | Neo4j TCP entrypoint (loopback-only) |
 | `TRAEFIK_MSSQL_PORT` | `1433` | MSSQL TCP entrypoint (loopback-only) |
 | `TRAEFIK_MYSQL_PORT` | `3306` | MySQL TCP entrypoint (loopback-only) |
 | `TRAEFIK_POSTGRES_PORT` | `5432` | Postgres TCP entrypoint (loopback-only) |
-| `SOCKET_PROXY_VERSION` | `v0.4.2` | Docker socket proxy image tag |
 | `TRAEFIK_LOG_LEVEL` | `INFO` | Log verbosity: DEBUG, INFO, WARN, ERROR |
 
-Override in `.env`. Keep `TRAEFIK_VERSION` pinned to a specific patch release
-for reproducibility.
+Override these settings in an optional `.env`. With non-default web ports, use
+the explicit port in browser URLs—for example, `http://demo.localtest.me:8080`
+and `https://demo.localtest.me:8443`. HTTPS mode constructs its redirect using
+the published `TRAEFIK_HTTPS_PORT`.
 
-The proxy uses `traefik:${TRAEFIK_VERSION}` and
-`ghcr.io/tecnativa/docker-socket-proxy:${SOCKET_PROXY_VERSION}`. The optional
-whoami demo uses the fixed `traefik/whoami:v1.10` image.
+Image versions are literal in the Compose manifests so Dependabot can update
+the authoritative values. The proxy uses Traefik `v3.7.8` and socket-proxy
+`v0.4.2`; the optional whoami demo uses `v1.11.0`.
 
 The TCP database ports conflict with local installs of MSSQL, MySQL, and
 Postgres. Comment out the relevant `ports:` lines in `docker-compose.yml` if
@@ -298,11 +344,11 @@ you run those databases directly on the host.
 
 ## TCP database routing (optional)
 
-The TCP entrypoints for Neo4j (7687), MSSQL (1433), MySQL (3306), and
-Postgres (5432) are defined in `traefik.yml` but **the matching port bindings
-in `docker-compose.yml` are commented out by default**. Uncomment only the
-ports you need and only when you are routing database containers through this
-proxy. Those ports commonly conflict with local database installs.
+The HTTPS Compose command defines TCP entrypoints for Neo4j (7687), MSSQL
+(1433), MySQL (3306), and Postgres (5432), but **the matching port bindings in
+`docker-compose.yml` are commented out by default**. Uncomment only the ports
+you need and only when you are routing database containers through this proxy.
+Those ports commonly conflict with local database installs.
 
 For example, to route a Postgres container, uncomment the Postgres host-port
 binding in `docker-compose.yml`, then add these labels to the database service:
@@ -331,31 +377,38 @@ the responsibility of the database protocol and client.
 
 ---
 
-## Static config
+## Install and dynamic config
 
-Traefik static configuration lives in [`traefik.yml`](./traefik.yml).
-Dynamic configuration (TLS material) lives in [`dynamic/tls.yml`](./dynamic/tls.yml).
-HTTP-only mode uses [`traefik.http.yml`](./traefik.http.yml) and the standalone
-[`docker-compose.http.yml`](./docker-compose.http.yml); it has no `websecure`
-entrypoint, HTTPS port, or certificate mount.
+Traefik install configuration lives in each Compose service's `command` list:
+[`docker-compose.yml`](./docker-compose.yml) for HTTPS and
+[`docker-compose.http.yml`](./docker-compose.http.yml) for HTTP-only mode.
+Traefik supports file, CLI, and environment install configuration as separate
+methods, so this repository uses CLI consistently rather than mixing methods.
+That lets Compose interpolate the selected network, log level, and external
+HTTPS redirect port. HTTP-only mode has no `websecure` entrypoint, HTTPS port,
+file provider, or certificate mount.
 
-The HTTPS Compose file mounts `dynamic/` read-only and Traefik watches it for
-hot reloads. Files placed there are loaded as dynamic Traefik configuration;
-use container paths such as `/etc/traefik/certs/localtest.me.crt` when referring
-to mounted files. The checked-in `tls.yml` expects the exact generated names
-`localtest.me.crt` and `localtest.me.key`. HTTP-only mode does not mount or load
-this directory.
+Dynamic TLS configuration lives in
+[`dynamic/tls.yml`](./dynamic/tls.yml).
 
-Key settings in `traefik.yml`:
+The HTTPS Compose file mounts `dynamic/` read-only and mounts only
+`certs/localtest.me.crt` and `certs/localtest.me.key` at their exact container
+paths. Traefik does not receive `certs/ca.crt` or any unrelated file that may
+exist in `certs/`. The checked-in `tls.yml` expects those exact leaf filenames.
+HTTP-only mode does not mount or load the dynamic directory or certificate
+files.
+
+Key install settings in the Compose commands:
 
 - `providers.docker.defaultRule` generates routes from `traefik.hostname`
   labels without explicit `Host()` rules in every label set.
 - `docker-compose.yml` sets the Docker provider endpoint and network with CLI
-  flags so `TRAEFIK_PROXY_NETWORK` stays in sync with Compose.
+  flags so `TRAEFIK_PROXY_NETWORK` stays in sync with Compose. It also sets the
+  redirect target to the externally published HTTPS port.
 - `providers.file` watches `dynamic/` for hot-reload of TLS config.
-- `entrypoints.web` redirects all HTTP to HTTPS permanently.
-- `api.insecure=false` - the dashboard is only accessible via the
-  `proxy.localtest.me` TLS route.
+- `entrypoints.web` redirects HTTP to HTTPS temporarily in HTTPS mode.
+- `api.insecure=false` - the dashboard is exposed only through a labeled
+  router: TLS in the default mode and loopback-only HTTP in HTTP mode.
 
 ---
 
@@ -410,8 +463,9 @@ http:
 ## Security notes
 
 - All ports are bound to `127.0.0.1` only - not exposed on the LAN.
-- The dashboard is served over HTTPS through the `proxy.localtest.me` route.
-  `api.insecure` is disabled.
+- The dashboard is served over HTTPS through the `proxy.localtest.me` route in
+  the default mode. The explicit HTTP fallback serves it over loopback HTTP.
+  `api.insecure` remains disabled in both modes.
 - Docker socket access effectively grants full Docker API access on the host.
   The raw socket is mounted only into `socket-proxy`; Traefik talks to the
   filtered API endpoint at `tcp://socket-proxy:2375`. Keep this stack
@@ -432,7 +486,7 @@ http:
   WSL2-published ports without `/etc/hosts` changes.
 - If any TCP port is already in use (e.g. a local Postgres on 5432), comment
   out that `ports:` line in `docker-compose.yml` and the corresponding
-  entrypoint in `traefik.yml`.
+  entrypoint argument in the HTTPS service's `command` list.
 - Certificate trust is determined by the Windows trust store, not the WSL2
   trust store. Use `mise run trust-ca` to import `certs/ca.crt` into Windows
   `CurrentUser\Root` (no admin required). To remove it: `mise run untrust-ca`.

@@ -9,11 +9,21 @@ set -euo pipefail
 # CA certificate land in certs/.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CERT_DIR="$ROOT_DIR/certs"
+CERT_DIR="${TRAEFIK_CERT_DIR:-$ROOT_DIR/certs}"
 
 CRT="$CERT_DIR/localtest.me.crt"
 KEY="$CERT_DIR/localtest.me.key"
 CA_CRT="$CERT_DIR/ca.crt"
+
+usage() {
+  cat <<'EOF'
+Usage: generate-dev-certs.sh [--force | --replace-ca]
+
+  --force       Regenerate the leaf certificate using the same mkcert CA.
+  --replace-ca  Replace certs/ca.crt after the old CA has been untrusted.
+                Prefer the guarded workflow: mise run replace-ca
+EOF
+}
 
 if ! command -v mkcert >/dev/null 2>&1; then
   echo "mkcert is required but was not found on PATH." >&2
@@ -27,25 +37,62 @@ fi
 mkdir -p "$CERT_DIR"
 
 FORCE=0
-[[ "${1:-}" == "--force" ]] && FORCE=1
+REPLACE_CA=0
+
+case "${1:-}" in
+  "")
+    ;;
+  --force)
+    FORCE=1
+    ;;
+  --replace-ca)
+    FORCE=1
+    REPLACE_CA=1
+    ;;
+  --help|-h)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "Unknown argument: $1" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
+
+if [[ "$#" -gt 1 ]]; then
+  echo "Only one argument is supported." >&2
+  usage >&2
+  exit 2
+fi
+
+CAROOT="$(mkcert -CAROOT)"
+CURRENT_CA="$CAROOT/rootCA.pem"
+CA_MISMATCH=0
+
+if [[ -f "$CA_CRT" ]]; then
+  if [[ ! -f "$CURRENT_CA" ]] || ! cmp -s "$CURRENT_CA" "$CA_CRT"; then
+    CA_MISMATCH=1
+  fi
+fi
+
+if [[ "$CA_MISMATCH" -eq 1 && "$REPLACE_CA" -eq 0 ]]; then
+  echo "Error: certs/ca.crt does not match mkcert's current root CA." >&2
+  echo "Refusing to overwrite the old CA certificate, including with --force," >&2
+  echo "because it is needed to remove the exact old root from trust stores." >&2
+  echo >&2
+  echo "Run 'mise run replace-ca' to untrust the old Windows root before replacing it." >&2
+  echo "Remove the old CA separately from any other trust stores where you installed it." >&2
+  exit 1
+fi
+
+if [[ "$REPLACE_CA" -eq 1 && "$CA_MISMATCH" -eq 0 ]]; then
+  echo "Error: certs/ca.crt already matches mkcert's current root CA." >&2
+  echo "Use --force if you only want to regenerate the leaf certificate." >&2
+  exit 1
+fi
 
 if [[ -f "$CRT" && -f "$KEY" && -f "$CA_CRT" && "$FORCE" -eq 0 ]]; then
-  CAROOT="$(mkcert -CAROOT)"
-  CURRENT_CA="$CAROOT/rootCA.pem"
-
-  if [[ ! -f "$CURRENT_CA" ]]; then
-    echo "Error: mkcert root CA not found at $CURRENT_CA." >&2
-    echo "Run mkcert -install, then regenerate the certificates." >&2
-    exit 1
-  fi
-
-  if ! cmp -s "$CURRENT_CA" "$CA_CRT"; then
-    echo "Error: certs/ca.crt does not match mkcert's current root CA." >&2
-    echo "Run this command again with --force to regenerate the leaf and CA copy." >&2
-    echo "Then run 'mise run trust-ca' to trust the new CA in Windows." >&2
-    exit 1
-  fi
-
   echo "Certificates already exist in certs/. Use --force to regenerate the leaf."
   exit 0
 fi
@@ -60,6 +107,10 @@ mkcert -cert-file "$CRT" -key-file "$KEY" \
 # Stage the mkcert root CA so the Windows trust step can import it. The CA
 # private key stays in CAROOT and is intentionally not copied here.
 CAROOT="$(mkcert -CAROOT)"
+if [[ ! -f "$CAROOT/rootCA.pem" ]]; then
+  echo "Error: mkcert did not create its root CA at $CAROOT/rootCA.pem." >&2
+  exit 1
+fi
 cp "$CAROOT/rootCA.pem" "$CA_CRT"
 
 chmod 600 "$KEY" 2>/dev/null || true
