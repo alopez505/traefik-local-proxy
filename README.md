@@ -15,20 +15,22 @@ utilities.
 ## Quick start
 
 ```bash
+mise install            # install pinned tools (mkcert, uv)
 cp .env.example .env    # review ports and Traefik version
-mise run certs          # generate local CA + wildcard cert (skips if present)
-mise run trust-ca       # import CA into Windows CurrentUser trust store (WSL2 → Windows)
+mise run certs          # generate the wildcard cert via mkcert (skips if present)
+mise run trust-ca       # import the CA into Windows CurrentUser\Root (WSL2 -> Windows)
 mise run up             # start Traefik
-mise run demo           # start whoami test service → https://demo.localtest.me
+mise run demo           # start whoami test service -> https://demo.localtest.me
 mise run demo-down      # remove the demo container after testing
+```
 
 Dashboard: <https://proxy.localtest.me>
 
-For a lower-ceremony alternative, [mkcert](https://github.com/FiloSottile/mkcert)
-auto-installs a local CA into both the Windows and WSL2 trust stores:
-`pre-commit` or `shellcheck` install required. It does assume you are inside a
-Git working tree, so run it from a normal clone or after `git init`.
-generated certs the same way and skip `mise run trust-ca`.
+Certificates are generated with [mkcert](https://github.com/FiloSottile/mkcert),
+which is pinned in `mise.toml` and installed by `mise install`. mkcert keeps its
+CA in its own CAROOT outside the repo; `mise run trust-ca` then imports the CA
+certificate into the Windows trust store so Windows browsers trust the HTTPS
+that Traefik serves from WSL2.
 
 ---
 
@@ -73,11 +75,11 @@ See the DNS-privacy note in the Certificate setup section below.
 
 ## Certificate setup (WSL2 + Windows)
 
-1. Generate or regenerate the local CA and wildcard cert:
+1. Generate the wildcard certificate (creates the mkcert CA on first run):
 
    ```bash
    ./scripts/generate-dev-certs.sh
-   # Use --force to replace existing certs
+   # Use --force to regenerate the leaf (reuses the existing mkcert CA)
    ```
 
 2. Import `certs/ca.crt` into the Windows trust store - **no admin required**:
@@ -89,8 +91,9 @@ See the DNS-privacy note in the Certificate setup section below.
    This invokes `scripts/trust-ca-windows.ps1`, which imports into
    `Cert:\CurrentUser\Root`. To remove it later: `mise run untrust-ca`.
 
-   Certs are valid 825 days (leaf) and 2 years (CA). To regenerate:
-   `./scripts/generate-dev-certs.sh --force` then `mise run trust-ca` again.
+   mkcert sets a browser-compatible validity on the leaf and a long-lived CA.
+   Because `--force` reuses the same mkcert CA, you do not need to re-run
+   `mise run trust-ca` after regenerating the leaf.
 
 3. Start Traefik and open <https://proxy.localtest.me>.
 
@@ -103,14 +106,15 @@ See the DNS-privacy note in the Certificate setup section below.
 > employer names as subdomains on a work network. Use generic names like
 > `api.localtest.me`, `demo.localtest.me`, `app.localtest.me`.
 >
-> **Team setup (onboarding):** Every developer generates their **own** local CA
-> on their own machine with `mise run certs` and trusts only that. Never commit
-> or share `ca.key`, and never hand one CA around for the whole team to trust:
-> whoever holds a CA key that other machines trust can mint trusted certificates
-> for *any* website on every machine that imported it. `certs/` is gitignored
-> and the pre-commit / CI gitleaks hooks are a backstop, but the rule is simple:
-> the CA private key never leaves the machine that created it. When you re-image
-> or hand off a machine, run `mise run untrust-ca` first.
+> **Team setup (onboarding):** Every developer runs `mise run certs`, which uses
+> mkcert to create their **own** local CA (stored in their own mkcert CAROOT) and
+> sign their own leaf. Never share that CA around for the whole team to trust:
+> whoever holds a CA private key that other machines trust can mint trusted
+> certificates for *any* website on every machine that imported it. mkcert keeps
+> the CA key in CAROOT, outside the repo, and `certs/` is gitignored (with the
+> pre-commit / CI gitleaks hooks as a backstop), so the CA private key never
+> leaves the machine that created it. When you re-image or hand off a machine,
+> run `mise run untrust-ca` first.
 
 ---
 
@@ -187,7 +191,7 @@ will be reachable at <https://myapp.localtest.me>.
 
 ## Available tasks
 
-Run `mise install` once to install repo-managed tools (uv), then use any task
+Run `mise install` once to install repo-managed tools (mkcert, uv), then use any task
 below. `mise run validate` is fully self-contained - no system-level
 `pre-commit` or `shellcheck` install required.
 
@@ -199,7 +203,7 @@ mise run restart    # restart Traefik process; use up to apply config changes
 mise run logs       # follow Traefik logs
 mise run ps         # show service status
 mise run pull       # pull newer image + restart
-mise run certs      # generate local CA + wildcard cert (skips if already present)
+mise run certs      # generate the wildcard cert via mkcert (skips if already present)
 mise run trust-ca   # import CA into Windows CurrentUser trust store (WSL2 → Windows)
 mise run untrust-ca # remove dev CA from Windows CurrentUser trust store
 mise run demo       # start whoami test service at https://demo.localtest.me
@@ -319,9 +323,10 @@ http:
   The raw socket is mounted only into `socket-proxy`; Traefik talks to the
   filtered API endpoint at `tcp://socket-proxy:2375`. Keep this stack
   local-only.
-- Private keys in `certs/` are mode `600` and are gitignored. The CA private
-  key is powerful - if it leaks and is trusted on any machine, an attacker can
-  mint trusted certificates for that CA scope. Treat it as a secret.
+- The leaf private key in `certs/` is mode `600` and gitignored; the CA private
+  key is not in the repo at all - mkcert keeps it in its CAROOT. That CA key is
+  powerful: if it leaks and is trusted on any machine, an attacker can mint
+  trusted certificates for that CA scope. Treat it as a secret.
 - Do not use client, project, or employer names as `localtest.me` subdomains
   on a work network. Use generic names (e.g. `demo`, `api`, `app`).
 

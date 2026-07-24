@@ -1,5 +1,6 @@
-# Import the Traefik Local Proxy dev CA into the Windows CurrentUser trust store.
-# No administrator privileges required - CurrentUser\Root is user-scoped.
+# Import the mkcert development CA (certs/ca.crt) into the Windows CurrentUser
+# trust store. No administrator privileges required - CurrentUser\Root is
+# user-scoped.
 #
 # Run from WSL2 via:
 #   mise run trust-ca

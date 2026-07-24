@@ -6,6 +6,8 @@
 
 [tools]
 uv = "0.10.10"
+# mkcert generates the local dev CA and wildcard cert (see tasks.certs).
+mkcert = "1.4.4"
 
 [tasks.up]
 description = "Start Traefik (creates proxy network if needed)"
@@ -36,7 +38,7 @@ description = "Pull a newer Traefik image and restart"
 run = "docker compose pull && docker compose up -d"
 
 [tasks.certs]
-description = "Generate local CA and wildcard cert (skips if already present)"
+description = "Generate wildcard cert via mkcert (skips if already present)"
 run = "./scripts/generate-dev-certs.sh"
 
 [tasks.config]
