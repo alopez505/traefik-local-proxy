@@ -97,15 +97,33 @@ docker network inspect "${TRAEFIK_PROXY_NETWORK:-proxy}" --format '{{range .Cont
 
 [tasks.demo]
 description = "Start whoami test service at https://demo.localtest.me"
-run = "docker compose -f examples/whoami/docker-compose.yml up -d"
+run = """
+if [ -f .env ]; then
+	docker compose --env-file .env -f examples/whoami/docker-compose.yml up -d
+else
+	docker compose -f examples/whoami/docker-compose.yml up -d
+fi
+"""
 
 [tasks.demo-http]
 description = "Start whoami test service at http://demo.localtest.me"
-run = "docker compose -f examples/whoami/docker-compose.http.yml up -d"
+run = """
+if [ -f .env ]; then
+	docker compose --env-file .env -f examples/whoami/docker-compose.http.yml up -d
+else
+	docker compose -f examples/whoami/docker-compose.http.yml up -d
+fi
+"""
 
 [tasks.demo-down]
 description = "Stop the whoami test service"
-run = "docker compose -f examples/whoami/docker-compose.yml down"
+run = """
+if [ -f .env ]; then
+	docker compose --env-file .env -f examples/whoami/docker-compose.yml down
+else
+	docker compose -f examples/whoami/docker-compose.yml down
+fi
+"""
 
 [tasks.smoke]
 description = "Run live HTTPS/HTTP mode-transition and custom-port smoke tests"
