@@ -98,11 +98,10 @@ It automatically picks them up - no restart required.
 
 ## What is localtest.me
 
-`localtest.me` is a public wildcard DNS domain that resolves every subdomain to
-loopback. Its commonly used IPv4 record is `127.0.0.1`. It is not an IETF
-standard like `localhost` - it is a convenience domain run by a third party.
-It works because the record is public:
-`*.localtest.me IN A 127.0.0.1`.
+`localtest.me` is a public wildcard DNS domain operated by a third party. Its
+commonly used IPv4 wildcard record, `*.localtest.me IN A 127.0.0.1`, resolves
+subdomains to the IPv4 loopback address. It is a convenience domain, not an
+IETF standard like `localhost`.
 
 This stack publishes Docker ports on IPv4 `127.0.0.1` only. Some resolvers also
 return IPv6 `::1`; if a browser selects IPv6 first and the request fails, use an
