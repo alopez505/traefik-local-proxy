@@ -86,6 +86,12 @@ if [[ "$CA_MISMATCH" -eq 1 && "$REPLACE_CA" -eq 0 ]]; then
   exit 1
 fi
 
+if [[ "$REPLACE_CA" -eq 1 && ! -f "$CA_CRT" ]]; then
+  echo "Error: $CA_CRT does not exist; there is no staged CA to replace." >&2
+  echo "Use --force to generate the leaf certificate and stage mkcert's current root CA." >&2
+  exit 1
+fi
+
 if [[ "$REPLACE_CA" -eq 1 && "$CA_MISMATCH" -eq 0 ]]; then
   echo "Error: $CA_CRT already matches mkcert's current root CA." >&2
   echo "Use --force if you only want to regenerate the leaf certificate." >&2
