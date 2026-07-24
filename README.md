@@ -102,6 +102,15 @@ See the DNS-privacy note in the Certificate setup section below.
 > `127.0.0.1`). Do not use confidential project names, client names, or
 > employer names as subdomains on a work network. Use generic names like
 > `api.localtest.me`, `demo.localtest.me`, `app.localtest.me`.
+>
+> **Team setup (onboarding):** Every developer generates their **own** local CA
+> on their own machine with `mise run certs` and trusts only that. Never commit
+> or share `ca.key`, and never hand one CA around for the whole team to trust:
+> whoever holds a CA key that other machines trust can mint trusted certificates
+> for *any* website on every machine that imported it. `certs/` is gitignored
+> and the pre-commit / CI gitleaks hooks are a backstop, but the rule is simple:
+> the CA private key never leaves the machine that created it. When you re-image
+> or hand off a machine, run `mise run untrust-ca` first.
 
 ---
 
