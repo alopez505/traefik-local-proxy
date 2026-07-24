@@ -6,7 +6,7 @@
 #  browsers reach Traefik running in WSL2 without /etc/hosts changes.
 #
 #  First-time setup:
-#    cp .env.example .env              # review ports and version
+#    cp .env.example .env              # optional: override ports and network
 #    mise run certs                    # generate local CA + wildcard cert
 #    mise run trust-ca                 # import CA into Windows CurrentUser trust store
 #    mise run up                       # start Traefik
@@ -23,25 +23,47 @@
 #      traefik.hostname: "myapp"
 #      traefik.http.routers.myapp.entrypoints: "websecure"
 #      traefik.http.routers.myapp.tls: "true"
+#      # Explicit backend port; required when Traefik cannot infer one.
 #      traefik.http.services.myapp.loadbalancer.server.port: "<container_port>"
 # =============================================================================
 
 services:
   proxy:
-    image: traefik:${TRAEFIK_VERSION:-v3.7.8}
+    image: traefik:v3.7.8
     container_name: traefik-local
     restart: unless-stopped
-    # Static config lives in traefik.yml; CLI flags override individual settings.
+    # Keep install configuration in one source. Traefik does not support mixing
+    # a static config file with CLI options.
     command:
-      - "--configfile=/etc/traefik/traefik.yml"
-      # LOG_LEVEL is documented in .env.example and wired here (YAML config
-      # does not expand ${...}, CLI flags do).
+      - "--global.sendanonymoususage=false"
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+      - "--ping=true"
       - "--log.level=${TRAEFIK_LOG_LEVEL:-INFO}"
+      - "--accesslog=true"
+      - "--providers.docker=true"
       # Route Docker discovery through socket-proxy instead of mounting the
       # Docker socket into Traefik.
       - "--providers.docker.endpoint=tcp://socket-proxy:2375"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.allowemptyservices=true"
+      - '--providers.docker.defaultrule=Host(`{{ index .Labels "traefik.hostname" }}.localtest.me`)'
       # Keep Traefik's Docker provider network in sync with the compose network.
       - "--providers.docker.network=${TRAEFIK_PROXY_NETWORK:-proxy}"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+      - "--entrypoints.web.address=:80"
+      # Traefik sees the container's :443 entrypoint, so explicitly use the
+      # published host HTTPS port when constructing HTTP redirects.
+      - "--entrypoints.web.http.redirections.entrypoint.to=:${TRAEFIK_HTTPS_PORT:-443}"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=false"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.http.tls=true"
+      - "--entrypoints.neo4j.address=:7687"
+      - "--entrypoints.mssql.address=:1433"
+      - "--entrypoints.mysql.address=:3306"
+      - "--entrypoints.postgres.address=:5432"
     depends_on:
       - socket-proxy
     labels:
@@ -63,12 +85,22 @@ services:
       # - "127.0.0.1:${TRAEFIK_MYSQL_PORT:-3306}:3306"
       # - "127.0.0.1:${TRAEFIK_POSTGRES_PORT:-5432}:5432"
     volumes:
-      # Static Traefik config
-      - ./traefik.yml:/etc/traefik/traefik.yml:ro
       # Dynamic config (TLS certificates, extra routers)
       - ./dynamic:/etc/traefik/dynamic:ro
-      # Generated TLS material - see scripts/generate-dev-certs.sh
-      - ./certs:/etc/traefik/certs:ro
+      # Mount only the leaf certificate and key. The copied CA certificate and
+      # any unrelated files in certs/ are not needed by Traefik.
+      - type: bind
+        source: ./certs/localtest.me.crt
+        target: /etc/traefik/certs/localtest.me.crt
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./certs/localtest.me.key
+        target: /etc/traefik/certs/localtest.me.key
+        read_only: true
+        bind:
+          create_host_path: false
     networks:
       - proxy
       - socket-proxy-net
@@ -80,13 +112,12 @@ services:
       start_period: 5s
 
   socket-proxy:
-    image: ghcr.io/tecnativa/docker-socket-proxy:${SOCKET_PROXY_VERSION:-v0.4.2}
+    image: ghcr.io/tecnativa/docker-socket-proxy:v0.4.2
     container_name: traefik-socket-proxy
     restart: unless-stopped
     environment:
       CONTAINERS: 1
       NETWORKS: 1
-      SERVICES: 1
       POST: 0
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro

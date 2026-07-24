@@ -25,4 +25,22 @@ To generate or regenerate the wildcard certificate:
 
 Because `--force` normally reuses the existing mkcert CA, a CA already imported
 into Windows stays trusted; you do not need to re-import after regenerating the
-leaf. If mkcert's CA was changed or reset, import the new CA again.
+leaf.
+
+If mkcert's CAROOT changes or its CA is reset, generation stops rather than
+overwriting `ca.crt`. Keep that old certificate until its exact thumbprint has
+been removed from every trust store where it was installed. For the Windows
+`CurrentUser\Root` store, use the guarded workflow:
+
+```bash
+mise run replace-ca
+```
+
+The task untrusts the CA represented by the existing `ca.crt`, replaces the
+staged CA and leaf, and trusts the new CA. Other trust stores such as WSL,
+Firefox/NSS, or Java must be managed separately.
+
+Older versions of this repository may have copied `ca.key` into this directory.
+It is not used: delete it after confirming its corresponding CA is no longer
+trusted. Current generation keeps the CA private key only in mkcert's CAROOT,
+and Compose mounts only the leaf certificate and leaf key into Traefik.
