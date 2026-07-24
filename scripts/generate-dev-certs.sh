@@ -4,7 +4,8 @@ set -euo pipefail
 # Generate the local development TLS material with mkcert.
 #
 # mkcert manages a local CA in its CAROOT (outside this repo) and signs a
-# wildcard leaf for *.localtest.me. The CA private key never enters the repo;
+# wildcard leaf for "*.${DOMAIN}" (default domain: localtest.me). The CA
+# private key never enters the repo;
 # only the leaf cert/key and a copy of the CA certificate land in certs/.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -41,7 +42,8 @@ if [[ -f "$CRT" && -f "$KEY" && -f "$CA_CRT" && "$FORCE" -eq 0 ]]; then
 
   if ! cmp -s "$CURRENT_CA" "$CA_CRT"; then
     echo "Error: certs/ca.crt does not match mkcert's current root CA." >&2
-    echo "Run this command again with --force to regenerate the leaf certificate." >&2
+    echo "Run this command again with --force to regenerate the leaf and CA copy." >&2
+    echo "Then run 'mise run trust-ca' to trust the new CA in Windows." >&2
     exit 1
   fi
 

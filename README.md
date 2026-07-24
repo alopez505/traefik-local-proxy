@@ -92,8 +92,9 @@ See the DNS-privacy note in the Certificate setup section below.
    `Cert:\CurrentUser\Root`. To remove it later: `mise run untrust-ca`.
 
    mkcert sets a browser-compatible validity on the leaf and a long-lived CA.
-   Because `--force` reuses the same mkcert CA, you do not need to re-run
-   `mise run trust-ca` after regenerating the leaf.
+    Because `--force` normally reuses the same mkcert CA, you do not need to
+    re-run `mise run trust-ca` after regenerating the leaf. If mkcert's CA was
+    changed or reset, import the new CA again after regeneration.
 
 3. Start Traefik and open <https://proxy.localtest.me>.
 

@@ -21,5 +21,6 @@ To generate or regenerate the wildcard certificate:
 ./scripts/generate-dev-certs.sh --force  # regenerate the leaf (reuses the mkcert CA)
 ```
 
-Because `--force` reuses the existing mkcert CA, a CA already imported into
-Windows stays trusted; you do not need to re-import after regenerating the leaf.
+Because `--force` normally reuses the existing mkcert CA, a CA already imported
+into Windows stays trusted; you do not need to re-import after regenerating the
+leaf. If mkcert's CA was changed or reset, import the new CA again.
