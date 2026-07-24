@@ -30,6 +30,21 @@ FORCE=0
 [[ "${1:-}" == "--force" ]] && FORCE=1
 
 if [[ -f "$CRT" && -f "$KEY" && -f "$CA_CRT" && "$FORCE" -eq 0 ]]; then
+  CAROOT="$(mkcert -CAROOT)"
+  CURRENT_CA="$CAROOT/rootCA.pem"
+
+  if [[ ! -f "$CURRENT_CA" ]]; then
+    echo "Error: mkcert root CA not found at $CURRENT_CA." >&2
+    echo "Run mkcert -install, then regenerate the certificates." >&2
+    exit 1
+  fi
+
+  if ! cmp -s "$CURRENT_CA" "$CA_CRT"; then
+    echo "Error: certs/ca.crt does not match mkcert's current root CA." >&2
+    echo "Run this command again with --force to regenerate the leaf certificate." >&2
+    exit 1
+  fi
+
   echo "Certificates already exist in certs/. Use --force to regenerate the leaf."
   exit 0
 fi

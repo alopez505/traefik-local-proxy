@@ -1,8 +1,9 @@
 # Remove the mkcert development CA from the Windows CurrentUser trust store.
 # No administrator privileges required.
 #
-# Note: mkcert uses a single machine-wide CA (in its CAROOT), so this removes
-# the CA that any other mkcert-based project on this machine also relies on.
+# Note: by default, mkcert uses one CA per user profile, shared by all projects
+# using the same CAROOT. Removing it from this user's trust store may therefore
+# affect other mkcert-based projects for this Windows user.
 #
 # Run from WSL2 via:
 #   mise run untrust-ca
