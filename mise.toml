@@ -6,6 +6,8 @@
 
 [tools]
 uv = "0.10.10"
+# mkcert generates the local dev CA and wildcard cert (see tasks.certs).
+mkcert = "1.4.4"
 
 [tasks.up]
 description = "Start Traefik (creates proxy network if needed)"
@@ -36,7 +38,7 @@ description = "Pull a newer Traefik image and restart"
 run = "docker compose pull && docker compose up -d"
 
 [tasks.certs]
-description = "Generate local CA and wildcard cert (skips if already present)"
+description = "Generate wildcard cert via mkcert (skips if already present)"
 run = "./scripts/generate-dev-certs.sh"
 
 [tasks.config]
@@ -75,8 +77,28 @@ run = "docker compose --env-file .env -f examples/whoami/docker-compose.yml down
 
 [tasks.trust-ca]
 description = "Import dev CA into Windows CurrentUser trust store (WSL2 -> Windows, no admin required)"
-run = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/trust-ca-windows.ps1"
+run = """
+POWERSHELL="${POWERSHELL:-powershell.exe}"
+if ! command -v "$POWERSHELL" >/dev/null 2>&1 && ! test -x "$POWERSHELL"; then
+	POWERSHELL="/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
+fi
+if ! command -v "$POWERSHELL" >/dev/null 2>&1 && ! test -x "$POWERSHELL"; then
+	echo 'Windows PowerShell was not found. Ensure WSL can access /mnt/c.' >&2
+	exit 1
+fi
+"$POWERSHELL" -NoProfile -ExecutionPolicy Bypass -File scripts/trust-ca-windows.ps1
+"""
 
 [tasks.untrust-ca]
 description = "Remove dev CA from Windows CurrentUser trust store"
-run = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/untrust-ca-windows.ps1"
+run = """
+POWERSHELL="${POWERSHELL:-powershell.exe}"
+if ! command -v "$POWERSHELL" >/dev/null 2>&1 && ! test -x "$POWERSHELL"; then
+	POWERSHELL="/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
+fi
+if ! command -v "$POWERSHELL" >/dev/null 2>&1 && ! test -x "$POWERSHELL"; then
+	echo 'Windows PowerShell was not found. Ensure WSL can access /mnt/c.' >&2
+	exit 1
+fi
+"$POWERSHELL" -NoProfile -ExecutionPolicy Bypass -File scripts/untrust-ca-windows.ps1
+"""
