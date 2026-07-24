@@ -103,6 +103,17 @@ if run_generator --replace-ca >"$TEST_ROOT/repeat.out" 2>&1; then
   exit 1
 fi
 
+rm -f -- "$TEST_CERT_DIR/ca.crt"
+if run_generator --replace-ca >"$TEST_ROOT/missing.out" 2>&1; then
+  echo "Expected --replace-ca to reject a missing staged CA." >&2
+  exit 1
+fi
+
+if ! grep -Fq "there is no staged CA to replace" "$TEST_ROOT/missing.out"; then
+  echo "The missing staged CA error was not reported accurately." >&2
+  exit 1
+fi
+
 if run_generator --unknown >"$TEST_ROOT/unknown.out" 2>&1; then
   echo "Expected an unknown argument to fail." >&2
   exit 1
