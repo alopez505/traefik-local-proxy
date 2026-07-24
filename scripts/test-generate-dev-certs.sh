@@ -81,6 +81,11 @@ if ! grep -Fq "Refusing to overwrite the old CA certificate" "$TEST_ROOT/force.o
   exit 1
 fi
 
+if ! grep -Fq "$TEST_CERT_DIR/ca.crt" "$TEST_ROOT/force.out"; then
+  echo "The CA mismatch error did not report the overridden certificate path." >&2
+  exit 1
+fi
+
 if ! cmp -s "$TEST_ROOT/old-ca.crt" "$TEST_CERT_DIR/ca.crt"; then
   echo "--force changed the stored CA despite the mismatch." >&2
   exit 1
