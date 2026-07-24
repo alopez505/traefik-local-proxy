@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Generate the local development TLS material with mkcert.
+#
+# mkcert manages a local CA in its CAROOT (outside this repo) and signs a
+# wildcard leaf for "*.${DOMAIN}" (default domain: localtest.me). The CA
+# private key never enters the repo;
+# only the leaf cert/key and a copy of the CA certificate land in certs/.
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CERT_DIR="$ROOT_DIR/certs"
 DOMAIN="${DOMAIN:-localtest.me}"
@@ -8,95 +15,73 @@ DOMAIN="${DOMAIN:-localtest.me}"
 CRT="$CERT_DIR/${DOMAIN}.crt"
 KEY="$CERT_DIR/${DOMAIN}.key"
 CA_CRT="$CERT_DIR/ca.crt"
-CA_KEY="$CERT_DIR/ca.key"
-CSR="$CERT_DIR/${DOMAIN}.csr"
-CONF="$(mktemp)"
 
-cleanup() {
-  rm -f "$CSR" "$CERT_DIR/ca.srl" "$CONF"
-}
-
-trap cleanup EXIT
-
-if ! command -v openssl >/dev/null 2>&1; then
-  echo "openssl is required" >&2
+if ! command -v mkcert >/dev/null 2>&1; then
+  echo "mkcert is required but was not found on PATH." >&2
+  echo >&2
+  echo "Install it one of these ways:" >&2
+  echo "  - mise install            (this repo pins mkcert in mise.toml)" >&2
+  echo "  - https://github.com/FiloSottile/mkcert#installation" >&2
   exit 1
 fi
 
 mkdir -p "$CERT_DIR"
 
-if [[ "${1:-}" == "--force" ]]; then
-  rm -f "$CRT" "$KEY" "$CA_CRT" "$CA_KEY" "$CSR" "$CERT_DIR/ca.srl"
-fi
+FORCE=0
+[[ "${1:-}" == "--force" ]] && FORCE=1
 
-if [[ -f "$CRT" && -f "$KEY" && -f "$CA_CRT" && -f "$CA_KEY" ]]; then
-  echo "Dev CA and wildcard cert already exist in certs/. Use --force to regenerate."
+if [[ -f "$CRT" && -f "$KEY" && -f "$CA_CRT" && "$FORCE" -eq 0 ]]; then
+  CAROOT="$(mkcert -CAROOT)"
+  CURRENT_CA="$CAROOT/rootCA.pem"
+
+  if [[ ! -f "$CURRENT_CA" ]]; then
+    echo "Error: mkcert root CA not found at $CURRENT_CA." >&2
+    echo "Run mkcert -install, then regenerate the certificates." >&2
+    exit 1
+  fi
+
+  if ! cmp -s "$CURRENT_CA" "$CA_CRT"; then
+    echo "Error: certs/ca.crt does not match mkcert's current root CA." >&2
+    echo "Run this command again with --force to regenerate the leaf and CA copy." >&2
+    echo "Then run 'mise run trust-ca' to trust the new CA in Windows." >&2
+    exit 1
+  fi
+
+  echo "Certificates already exist in certs/. Use --force to regenerate the leaf."
   exit 0
 fi
 
-# ---------------------------------------------------------------------------
-# OpenSSL config for the leaf (server) certificate
-# ---------------------------------------------------------------------------
-cat > "$CONF" <<EOF
-[req]
-default_bits       = 2048
-prompt             = no
-default_md         = sha256
-distinguished_name = dn
-req_extensions     = req_ext
+# Signing the leaf below creates the mkcert local CA on first use if it does
+# not exist yet. Regenerating with --force reuses the same CA, so a CA already
+# trusted via 'mise run trust-ca' stays trusted (no re-import needed).
+echo "Generating wildcard certificate for ${DOMAIN} with mkcert..."
+mkcert -cert-file "$CRT" -key-file "$KEY" \
+  "${DOMAIN}" "*.${DOMAIN}" localhost 127.0.0.1 ::1
 
-[dn]
-C  = ${CERT_COUNTRY:-US}
-ST = ${CERT_STATE:-CA}
-L  = ${CERT_LOCALITY:-Local}
-O  = ${CERT_ORG:-Local Development}
-OU = ${CERT_OU:-Traefik Local Proxy}
-CN = ${DOMAIN}
+# Stage the mkcert root CA so the Windows trust step can import it. The CA
+# private key stays in CAROOT and is intentionally not copied here.
+CAROOT="$(mkcert -CAROOT)"
+cp "$CAROOT/rootCA.pem" "$CA_CRT"
 
-[req_ext]
-subjectAltName     = @alt_names
-basicConstraints   = critical,CA:FALSE
-extendedKeyUsage   = serverAuth
-keyUsage           = digitalSignature,keyEncipherment
-
-[alt_names]
-DNS.1 = ${DOMAIN}
-DNS.2 = *.${DOMAIN}
-DNS.3 = localhost
-IP.1  = 127.0.0.1
-EOF
-
-echo "Generating local development CA (2-year validity)..."
-openssl genrsa -out "$CA_KEY" 2048 >/dev/null 2>&1
-openssl req -x509 -new -nodes -key "$CA_KEY" -sha256 -days 730 \
-  -subj "/C=${CERT_COUNTRY:-US}/ST=${CERT_STATE:-CA}/L=${CERT_LOCALITY:-Local}/O=${CERT_ORG:-Local Development}/OU=${CERT_OU:-Traefik Local Proxy}/CN=${CERT_CA_CN:-Traefik Local Proxy Dev CA}" \
-  -addext "basicConstraints = critical,CA:TRUE" \
-  -addext "keyUsage = critical,keyCertSign,cRLSign" \
-  -addext "subjectKeyIdentifier = hash" \
-  -out "$CA_CRT" >/dev/null 2>&1
-
-echo "Generating wildcard server certificate for ${DOMAIN} (825-day validity)..."
-openssl genrsa -out "$KEY" 2048 >/dev/null 2>&1
-openssl req -new -key "$KEY" -out "$CSR" -config "$CONF" >/dev/null 2>&1
-openssl x509 -req -in "$CSR" \
-  -CA "$CA_CRT" -CAkey "$CA_KEY" -CAcreateserial \
-  -out "$CRT" -days 825 -sha256 -extensions req_ext -extfile "$CONF" >/dev/null 2>&1
-
-# Harden permissions: private keys read only by owner, certs world-readable.
-chmod 600 "$CA_KEY" "$KEY" 2>/dev/null || true
-chmod 644 "$CA_CRT" "$CRT" 2>/dev/null || true
+chmod 600 "$KEY" 2>/dev/null || true
+chmod 644 "$CRT" "$CA_CRT" 2>/dev/null || true
 
 echo "Created:"
-echo "  certs/ca.crt         (CA certificate - import into Windows trust store)"
-echo "  certs/ca.key         (CA private key - keep local, do not share)"
-echo "  certs/${DOMAIN}.crt"
-echo "  certs/${DOMAIN}.key"
+echo "  certs/${DOMAIN}.crt   (wildcard leaf, mkcert-signed)"
+echo "  certs/${DOMAIN}.key   (leaf private key - keep local, do not share)"
+echo "  certs/ca.crt          (mkcert root CA - import into Windows trust store)"
+echo
+echo "mkcert CAROOT (holds the CA and its private key): $CAROOT"
 echo
 echo "Next step: run 'mise run trust-ca' to import certs/ca.crt into Windows"
-echo "CurrentUser\\Root (no admin required) so browsers trust HTTPS from WSL2."
+echo "CurrentUser\\Root (no admin required) so Windows browsers trust HTTPS from WSL2."
+echo "Optional, to also trust HTTPS from inside WSL (curl, etc.): mkcert -install"
 echo
 echo "Note: on a managed/corporate device, confirm that installing a custom"
-echo "root CA is permitted by your IT policy before running trust-ca."
-echo
-echo "CA fingerprint (SHA-256):"
-openssl x509 -in "$CA_CRT" -noout -fingerprint -sha256
+echo "root CA is permitted by your IT policy before trusting the CA."
+
+if command -v openssl >/dev/null 2>&1; then
+  echo
+  echo "CA fingerprint (SHA-256):"
+  openssl x509 -in "$CA_CRT" -noout -fingerprint -sha256
+fi
