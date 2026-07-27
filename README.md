@@ -285,9 +285,10 @@ will be reachable at <https://myapp.localtest.me>.
 This proxy is intended to remain running as shared local infrastructure. Both
 proxy services use `restart: unless-stopped`, so Docker restarts them after a
 Docker Engine or machine restart unless you explicitly stopped them. Start the
-proxy once with `mise run up`, use `mise run update` to apply image or
-configuration updates, and avoid `mise run down` during normal use because it
-also tries to remove the shared network.
+proxy once with `mise run up` (or `mise run up-http` for HTTP-only), use
+`mise run update` (or `mise run update-http`) to apply image or configuration
+updates, and avoid `mise run down` during normal use because it also tries to
+remove the shared network.
 
 For a project with an application and a database, attach the application to
 both its private project network and the shared `proxy` network. Keep the
