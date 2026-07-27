@@ -1,5 +1,6 @@
 # Local config - never commit
 .env
+.local/
 
 # Generated local TLS material - never commit private keys or certs.
 # Only certs/README.md is tracked.

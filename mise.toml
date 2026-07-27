@@ -89,10 +89,7 @@ echo 'Validation OK'
 [tasks.network]
 description = "Show containers currently attached to proxy"
 run = """
-set -a
-[ -f .env ] && . ./.env
-set +a
-docker network inspect "${TRAEFIK_PROXY_NETWORK:-proxy}" --format '{{range .Containers}}{{println .Name}}{{end}}' 2>/dev/null || echo "${TRAEFIK_PROXY_NETWORK:-proxy} network not yet created (run: mise run up)"
+docker network inspect proxy --format '{{range .Containers}}{{println .Name}}{{end}}' 2>/dev/null || echo "proxy network not yet created (run: mise run up)"
 """
 
 [tasks.demo]

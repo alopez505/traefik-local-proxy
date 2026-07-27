@@ -6,7 +6,7 @@
 #  browsers reach Traefik running in WSL2 without /etc/hosts changes.
 #
 #  First-time setup:
-#    cp .env.example .env              # optional: override ports and network
+#    cp .env.example .env              # optional: override ports and log level
 #    mise run certs                    # generate local CA + wildcard cert
 #    mise run trust-ca                 # import CA into Windows CurrentUser trust store
 #    mise run up                       # start Traefik
@@ -17,7 +17,7 @@
 #    networks:
 #      proxy:
 #        external: true
-#        name: ${TRAEFIK_PROXY_NETWORK:-proxy}
+#        name: proxy
 #    labels:
 #      traefik.enable: "true"
 #      traefik.hostname: "myapp"
@@ -48,8 +48,7 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.allowemptyservices=true"
       - '--providers.docker.defaultrule=Host(`{{ index .Labels "traefik.hostname" }}.localtest.me`)'
-      # Keep Traefik's Docker provider network in sync with the compose network.
-      - "--providers.docker.network=${TRAEFIK_PROXY_NETWORK:-proxy}"
+      - "--providers.docker.network=proxy"
       - "--providers.file.directory=/etc/traefik/dynamic"
       - "--providers.file.watch=true"
       - "--entrypoints.web.address=:80"
@@ -130,9 +129,9 @@ networks:
   #   networks:
   #     proxy:
   #       external: true
-  #       name: ${TRAEFIK_PROXY_NETWORK:-proxy}
+  #       name: proxy
   proxy:
-    name: ${TRAEFIK_PROXY_NETWORK:-proxy}
+    name: proxy
 
   # Internal-only network between Traefik and socket-proxy.
   socket-proxy-net:
