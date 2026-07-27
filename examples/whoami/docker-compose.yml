@@ -30,4 +30,4 @@ services:
 networks:
   proxy:
     external: true
-    name: ${TRAEFIK_PROXY_NETWORK:-proxy}
+    name: proxy

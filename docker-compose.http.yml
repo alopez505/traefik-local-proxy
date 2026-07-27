@@ -19,7 +19,7 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.allowemptyservices=true"
       - '--providers.docker.defaultrule=Host(`{{ index .Labels "traefik.hostname" }}.localtest.me`)'
-      - "--providers.docker.network=${TRAEFIK_PROXY_NETWORK:-proxy}"
+      - "--providers.docker.network=proxy"
       - "--entrypoints.web.address=:80"
     depends_on:
       - socket-proxy
@@ -56,6 +56,6 @@ services:
 
 networks:
   proxy:
-    name: ${TRAEFIK_PROXY_NETWORK:-proxy}
+    name: proxy
   socket-proxy-net:
     internal: true
