@@ -29,7 +29,7 @@
 
 services:
   proxy:
-    image: traefik:v3.7.8
+    image: traefik:v3.7.9
     container_name: traefik-local
     restart: unless-stopped
     # Traefik treats file, CLI, and environment install configuration as
