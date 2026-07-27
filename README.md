@@ -279,6 +279,80 @@ will be reachable at <https://myapp.localtest.me>.
 
 ---
 
+## Project database networking
+
+This proxy is intended to remain running as shared local infrastructure. Both
+proxy services use `restart: unless-stopped`, so Docker restarts them after a
+Docker Engine or machine restart unless you explicitly stopped them. Start the
+proxy once with `mise run up`, use `mise run update` to apply image or
+configuration updates, and avoid `mise run down` during normal use because it
+also tries to remove the shared network.
+
+For a project with an application and a database, attach the application to
+both its private project network and the shared `proxy` network. Keep the
+database only on the private project network:
+
+```yaml
+services:
+  myapp:
+    image: myapp:latest
+    networks:
+      - default
+      - proxy
+    labels:
+      traefik.enable: "true"
+      traefik.hostname: "project-a"
+      traefik.http.routers.project-a.entrypoints: "websecure"
+      traefik.http.routers.project-a.tls: "true"
+      traefik.http.services.project-a.loadbalancer.server.port: "3000"
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_PASSWORD: example
+    networks:
+      - default
+    # Optional access for a host client such as DBeaver:
+    ports:
+      - "127.0.0.1:15432:5432"
+
+networks:
+  proxy:
+    external: true
+    name: ${TRAEFIK_PROXY_NETWORK:-proxy}
+```
+
+The application connects directly to `postgres:5432` using Docker's internal
+DNS; it does not send its database traffic through Traefik. A browser reaches
+the application through Traefik at <https://project-a.localtest.me>. If
+DBeaver, SSMS, or another host application needs database access, publish a
+unique loopback port from that project's database container, such as
+`127.0.0.1:15432` above. Use a different host port for each project.
+
+The same direct-networking pattern applies to every supported database. If the
+Compose service uses the conventional name, the application connects to:
+
+- Postgres: `postgres:5432`
+- MSSQL: `mssql:1433`
+- MySQL: `mysql:3306`
+- Neo4j: `neo4j:7687`
+
+```mermaid
+flowchart LR
+  Browser -->|"HTTPS"| Traefik
+  Traefik -->|"shared proxy network"| Application
+  Application -->|"private project network"| Database
+  Client["Database client"] -->|"optional unique loopback port"| Database
+```
+
+The shared TCP entrypoints described below are an opt-in alternative for a
+single database service per entrypoint. Rules such as ``HostSNI(`*`)`` match
+all connections and cannot distinguish several Postgres, MSSQL, MySQL, or
+Neo4j services on the same port. They are therefore not the recommended
+database path when multiple projects use the same database protocol.
+
+---
+
 ## Available tasks
 
 Run `mise install` once to install repo-managed tools (mkcert, uv), then use any task
@@ -336,9 +410,9 @@ Image versions are literal in the Compose manifests so Dependabot can update
 the authoritative values. The proxy uses Traefik `v3.7.8` and socket-proxy
 `v0.5.0`; the optional whoami demo uses `v1.11.0`.
 
-The TCP database ports conflict with local installs of MSSQL, MySQL, and
-Postgres. Comment out the relevant `ports:` lines in `docker-compose.yml` if
-you run those databases directly on the host.
+The TCP database port bindings are commented out by default because they
+conflict with local installs of Neo4j, MSSQL, MySQL, and Postgres. Leave the
+relevant bindings disabled if those ports are already in use on the host.
 
 ---
 
@@ -347,8 +421,10 @@ you run those databases directly on the host.
 The HTTPS Compose command defines TCP entrypoints for Neo4j (7687), MSSQL
 (1433), MySQL (3306), and Postgres (5432), but **the matching port bindings in
 `docker-compose.yml` are commented out by default**. Uncomment only the ports
-you need and only when you are routing database containers through this proxy.
-Those ports commonly conflict with local database installs.
+you need and only when you are routing a single database service through each
+entrypoint. Those ports commonly conflict with local database installs. For
+the normal multi-project setup, use private project networking and optional
+per-project loopback bindings as described above.
 
 For example, to route a Postgres container, uncomment the Postgres host-port
 binding in `docker-compose.yml`, then add these labels to the database service:
@@ -484,9 +560,9 @@ http:
 - Docker Engine runs on the WSL2 instance - `mise run up` runs there too.
 - `*.localtest.me` resolves publicly to `127.0.0.1`, so Windows browsers reach
   WSL2-published ports without `/etc/hosts` changes.
-- If any TCP port is already in use (e.g. a local Postgres on 5432), comment
-  out that `ports:` line in `docker-compose.yml` and the corresponding
-  entrypoint argument in the HTTPS service's `command` list.
+- The optional database port bindings are disabled by default. If an enabled
+  port conflicts with a local database, disable that binding again or assign a
+  different `TRAEFIK_*_PORT` value in `.env`.
 - Certificate trust is determined by the Windows trust store, not the WSL2
   trust store. Use `mise run trust-ca` to import `certs/ca.crt` into Windows
   `CurrentUser\Root` (no admin required). To remove it: `mise run untrust-ca`.
