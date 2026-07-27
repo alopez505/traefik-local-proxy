@@ -28,7 +28,7 @@ not generate certificates or modify the Windows trust store.
 
 ```bash
 mise install            # install pinned tools (mkcert, uv)
-cp .env.example .env    # optional: override ports, network name, or log level
+cp .env.example .env    # optional: override ports or log level
 mise run certs          # generate the wildcard cert via mkcert (skips if present)
 mise run trust-ca       # import the CA into Windows CurrentUser\Root (WSL2 -> Windows)
 mise run up             # start Traefik
@@ -230,7 +230,7 @@ services:
 networks:
   proxy:
     external: true
-    name: ${TRAEFIK_PROXY_NETWORK:-proxy}
+    name: proxy
 ```
 
 > **Hostname with the default rule:** if you rely on the default rule, set
@@ -266,17 +266,15 @@ services:
 networks:
   proxy:
     external: true
-    name: ${TRAEFIK_PROXY_NETWORK:-proxy}
+    name: proxy
 ```
 
 Start `traefik-local-proxy` first, then start the other project. The service
 will be reachable at <https://myapp.localtest.me>.
 
-> **Custom network name:** If you set `TRAEFIK_PROXY_NETWORK` to something other
-> than `proxy`, set the same value in each consuming project's `.env`, or replace
-> the variable reference with the concrete network name. If the names diverge,
-> Traefik discovers containers but routes traffic through the wrong network and
-> nothing loads.
+> **Required network name:** The shared Traefik network must be named `proxy`.
+> Every consuming Compose project must join an external network with
+> `name: proxy`; the network name is not configurable.
 
 ---
 
@@ -321,7 +319,7 @@ services:
 networks:
   proxy:
     external: true
-    name: ${TRAEFIK_PROXY_NETWORK:-proxy}
+    name: proxy
 ```
 
 The application connects directly to `postgres:5432` using Docker's internal
@@ -394,7 +392,6 @@ containers exist.
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `TRAEFIK_PROXY_NETWORK` | `proxy` | Shared Docker network name |
 | `TRAEFIK_HTTP_PORT` | `80` | Host HTTP port (bound to 127.0.0.1; redirects to HTTPS in HTTPS mode) |
 | `TRAEFIK_HTTPS_PORT` | `443` | Host HTTPS port (bound to 127.0.0.1 and included in redirects) |
 | `TRAEFIK_NEO4J_PORT` | `7687` | Neo4j TCP entrypoint (loopback-only) |
@@ -444,7 +441,7 @@ services:
 networks:
   proxy:
     external: true
-    name: ${TRAEFIK_PROXY_NETWORK:-proxy}
+    name: proxy
 ```
 
 Connect the client to `127.0.0.1:${TRAEFIK_POSTGRES_PORT:-5432}`. Repeat the
@@ -479,9 +476,9 @@ Key install settings in the Compose commands:
 
 - `providers.docker.defaultRule` generates routes from `traefik.hostname`
   labels without explicit `Host()` rules in every label set.
-- `docker-compose.yml` sets the Docker provider endpoint and network with CLI
-  flags so `TRAEFIK_PROXY_NETWORK` stays in sync with Compose. It also sets the
-  redirect target to the externally published HTTPS port.
+- `docker-compose.yml` sets the Docker provider endpoint and fixed `proxy`
+  network with CLI flags. It also sets the redirect target to the externally
+  published HTTPS port.
 - `providers.file` watches `dynamic/` for hot-reload of TLS config.
 - `entrypoints.web` redirects HTTP to HTTPS temporarily in HTTPS mode.
 - `api.insecure=false` - the dashboard is exposed only through a labeled

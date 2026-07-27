@@ -1,15 +1,13 @@
 #!/usr/bin/env bash
 #
-# Live routing smoke test. Uses high loopback ports and a dedicated network,
-# and refuses to disturb an existing stack that uses the fixed container names.
+# Live routing smoke test. Uses high loopback ports and refuses to disturb an
+# existing stack that uses the fixed container names or proxy network.
 
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROXY_PROJECT="traefik-local-proxy-smoke"
 DEMO_PROJECT="traefik-whoami-smoke"
-SMOKE_SUFFIX="$$"
-SMOKE_NETWORK="traefik-proxy-smoke-$SMOKE_SUFFIX"
 HTTP_PORT="${SMOKE_HTTP_PORT:-18080}"
 HTTPS_PORT="${SMOKE_HTTPS_PORT:-18443}"
 CRT="$ROOT_DIR/certs/localtest.me.crt"
@@ -17,7 +15,6 @@ KEY="$ROOT_DIR/certs/localtest.me.key"
 GENERATED_CERTS=0
 HEADERS_FILE="$(mktemp)"
 
-export TRAEFIK_PROXY_NETWORK="$SMOKE_NETWORK"
 export TRAEFIK_HTTP_PORT="$HTTP_PORT"
 export TRAEFIK_HTTPS_PORT="$HTTPS_PORT"
 export TRAEFIK_LOG_LEVEL="INFO"
@@ -64,6 +61,12 @@ for container in traefik-local traefik-socket-proxy traefik-whoami-demo; do
     exit 1
   fi
 done
+
+if docker network inspect proxy >/dev/null 2>&1; then
+  echo "Refusing to run: the 'proxy' network already exists." >&2
+  echo "Stop the active proxy/demo stack with 'mise run down' before running this smoke test." >&2
+  exit 1
+fi
 
 if [[ -f "$CRT" && -f "$KEY" ]]; then
   :
