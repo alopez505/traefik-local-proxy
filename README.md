@@ -334,7 +334,7 @@ the published `TRAEFIK_HTTPS_PORT`.
 
 Image versions are literal in the Compose manifests so Dependabot can update
 the authoritative values. The proxy uses Traefik `v3.7.8` and socket-proxy
-`v0.4.2`; the optional whoami demo uses `v1.11.0`.
+`v0.5.0`; the optional whoami demo uses `v1.11.0`.
 
 The TCP database ports conflict with local installs of MSSQL, MySQL, and
 Postgres. Comment out the relevant `ports:` lines in `docker-compose.yml` if
