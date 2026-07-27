@@ -20,8 +20,9 @@ one startup mode.
 The HTTPS mode is the default and is closest to production; the HTTP mode does
 not generate certificates or modify the Windows trust store.
 
-`mise install` installs `mkcert` `1.4.4` and `uv` `0.10.10`. The validation task
-uses `uvx pre-commit==4.2.0`; `uv` is otherwise only needed for that task.
+`mise install` installs the repo-pinned versions of `mkcert` and `uv` defined in
+`mise.toml`. The validation task runs a pinned version of `pre-commit` through
+`uvx`; `uv` is otherwise only needed for that task.
 
 ### HTTPS mode (default)
 
@@ -406,9 +407,8 @@ the explicit port in browser URLs—for example, `http://demo.localtest.me:8080`
 and `https://demo.localtest.me:8443`. HTTPS mode constructs its redirect using
 the published `TRAEFIK_HTTPS_PORT`.
 
-Image versions are literal in the Compose manifests so Dependabot can update
-the authoritative values. The proxy uses Traefik `v3.7.8` and socket-proxy
-`v0.5.0`; the optional whoami demo uses `v1.11.0`.
+Image versions are declared directly in the Compose manifests, which are the
+authoritative source and are updated by Dependabot.
 
 The TCP database port bindings are commented out by default because they
 conflict with local installs of Neo4j, MSSQL, MySQL, and Postgres. Leave the
