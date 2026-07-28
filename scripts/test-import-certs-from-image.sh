@@ -207,4 +207,24 @@ if ! grep -q "Missing value for --cert-path" "$TEST_ROOT/missing-value.out"; the
   exit 1
 fi
 
+# 9. Identical destination cert/key paths are rejected before anything is
+# pulled or written, so a private key can never be left where the cert should
+# be under a false success.
+dest_same="$TEST_ROOT/dest-same"
+mkdir -p "$dest_same"
+if run_importer fake-image:1 --cert-path /certs/valid.crt --key-path /certs/valid.key \
+  --dest-cert "$dest_same/same.pem" --dest-key "$dest_same/same.pem" >"$TEST_ROOT/same-dest.out" 2>&1; then
+  echo "Expected identical --dest-cert/--dest-key to be rejected." >&2
+  exit 1
+fi
+if ! grep -q "must be different paths" "$TEST_ROOT/same-dest.out"; then
+  echo "Expected an identical-destination rejection message, got:" >&2
+  cat "$TEST_ROOT/same-dest.out" >&2
+  exit 1
+fi
+if [[ -e "$dest_same/same.pem" ]]; then
+  echo "Expected nothing to be written when destinations are identical." >&2
+  exit 1
+fi
+
 echo "Certificate import regression tests passed."

@@ -37,9 +37,11 @@ dashboard_enabled="$(get_var TRAEFIK_DASHBOARD_ENABLED true)"
 
 warned=0
 
-if [[ "$web_bind" != "127.0.0.1" && "$dashboard_enabled" == "true" ]]; then
-  echo "WARNING: TRAEFIK_WEB_BIND_ADDRESS is '$web_bind' (non-loopback) while the dashboard is still enabled." >&2
-  echo "         Consider TRAEFIK_DASHBOARD_ENABLED=false, or otherwise protecting the dashboard, before exposing the web ports beyond 127.0.0.1." >&2
+if [[ "$web_bind" != "127.0.0.1" ]]; then
+  echo "WARNING: TRAEFIK_WEB_BIND_ADDRESS is '$web_bind' (non-loopback). Every routed web service will be reachable on that interface, not just on 127.0.0.1." >&2
+  if [[ "$dashboard_enabled" == "true" ]]; then
+    echo "         The dashboard is also still enabled. Consider TRAEFIK_DASHBOARD_ENABLED=false, or otherwise protecting the dashboard, before exposing the web ports beyond 127.0.0.1." >&2
+  fi
   warned=1
 fi
 

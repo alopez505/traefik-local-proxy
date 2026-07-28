@@ -125,6 +125,15 @@ fi
 DEST_CERT="${DEST_CERT:-$DEST_DIR/imported.crt}"
 DEST_KEY="${DEST_KEY:-$DEST_DIR/imported.key}"
 
+# Reject identical destinations before pulling or writing anything: otherwise
+# the cert move succeeds, the key move overwrites it, and the script reports a
+# successful pair while leaving only private-key content at that path.
+if [[ "$DEST_CERT" == "$DEST_KEY" ]]; then
+  echo "Destination certificate and key must be different paths (both resolve to: $DEST_CERT)." >&2
+  usage >&2
+  exit 2
+fi
+
 if [[ ( -e "$DEST_CERT" || -e "$DEST_KEY" ) && "$FORCE" -ne 1 ]]; then
   echo "Refusing to overwrite existing destination files without --force:" >&2
   [[ -e "$DEST_CERT" ]] && echo "  $DEST_CERT" >&2

@@ -83,7 +83,7 @@ fi
 FAILED=0
 
 # --- Expiry ------------------------------------------------------------------
-end_date_raw="$(openssl x509 -in "$CERT" -noout -enddate 2>/dev/null | sed 's/^notAfter=//')"
+end_date_raw="$(openssl x509 -in "$CERT" -noout -enddate 2>/dev/null | sed 's/^notAfter=//' || true)"
 if [[ -z "$end_date_raw" ]]; then
   echo "FAIL expiry: could not read the certificate's expiry date."
   FAILED=1
@@ -103,11 +103,15 @@ else
 fi
 
 # --- SAN coverage --------------------------------------------------------------
+# Routed hosts are all *.localtest.me subdomains (proxy.localtest.me,
+# demo.localtest.me, ...), so the wildcard SAN is what actually matters. An
+# apex-only "localtest.me" SAN covers none of those routes, so require the
+# wildcard specifically rather than any localtest.me match.
 san="$(openssl x509 -in "$CERT" -noout -ext subjectAltName 2>/dev/null || true)"
-if grep -Eq 'DNS:(\*\.)?localtest\.me([,[:space:]]|$)' <<<"$san"; then
-  echo "PASS SAN coverage: localtest.me is covered."
+if grep -Eq 'DNS:\*\.localtest\.me([,[:space:]]|$)' <<<"$san"; then
+  echo "PASS SAN coverage: *.localtest.me is covered."
 else
-  echo "WARN SAN coverage: localtest.me/*.localtest.me not found in the certificate's SAN - expected for a bring-your-own certificate covering different names, otherwise check the certificate."
+  echo "WARN SAN coverage: *.localtest.me not found in the certificate's SAN - expected for a bring-your-own certificate covering different names, otherwise routed hosts such as proxy.localtest.me will not be covered."
 fi
 
 # --- Cert/key pairing ----------------------------------------------------------

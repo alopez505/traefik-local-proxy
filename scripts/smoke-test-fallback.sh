@@ -173,12 +173,16 @@ export TRAEFIK_FALLBACK_TO_COMPOSE_SERVICE_NAME=false
 export TRAEFIK_FALLBACK_TO_CONTAINER_NAME=true
 proxy up -d
 wait_for_health proxy
-# shellcheck disable=SC2046
-assert_status 404 "$(svc_url)" $(resolve_args svcname.localtest.me)
+# Prove the positive container-name route first: wait_for_health only confirms
+# Traefik's ping works, not that the Docker provider has re-read the fixtures
+# after this recreate. Asserting the negative svcname 404 before that could
+# pass simply because nothing is loaded yet.
 # shellcheck disable=SC2046
 wait_for_url proxy "$(svc_container_url)" $(resolve_args "${SVC_CONTAINER}.localtest.me")
 # shellcheck disable=SC2046
 assert_status 200 "$(svc_container_url)" $(resolve_args "${SVC_CONTAINER}.localtest.me")
+# shellcheck disable=SC2046
+assert_status 404 "$(svc_url)" $(resolve_args svcname.localtest.me)
 
 echo "Flags 11 (both true): Compose service name tier wins..."
 export TRAEFIK_FALLBACK_TO_COMPOSE_SERVICE_NAME=true
