@@ -21,7 +21,7 @@ Usage: generate-dev-certs.sh [--force | --replace-ca]
 
   --force       Regenerate the leaf certificate using the same mkcert CA.
   --replace-ca  Replace $CA_CRT after the old CA has been untrusted.
-                Prefer the guarded workflow: mise run replace-ca
+                Prefer the guarded workflow: mise run certificates:replace-ca
 EOF
 }
 
@@ -81,7 +81,7 @@ if [[ "$CA_MISMATCH" -eq 1 && "$REPLACE_CA" -eq 0 ]]; then
   echo "Refusing to overwrite the old CA certificate, including with --force," >&2
   echo "because it is needed to remove the exact old root from trust stores." >&2
   echo >&2
-  echo "Run 'mise run replace-ca' to untrust the old Windows root before replacing it." >&2
+  echo "Run 'mise run certificates:replace-ca' to untrust the old Windows root before replacing it." >&2
   echo "Remove the old CA separately from any other trust stores where you installed it." >&2
   exit 1
 fi
@@ -105,7 +105,7 @@ fi
 
 # Signing the leaf below creates the mkcert local CA on first use if it does
 # not exist yet. Regenerating with --force reuses the same CA, so a CA already
-# trusted via 'mise run trust-ca' stays trusted (no re-import needed).
+# trusted via 'mise run certificates:trust-ca' stays trusted (no re-import needed).
 echo "Generating wildcard certificate for localtest.me with mkcert..."
 mkcert -cert-file "$CRT" -key-file "$KEY" \
   localtest.me "*.localtest.me" localhost 127.0.0.1 ::1
@@ -130,7 +130,7 @@ echo
 echo "mkcert CAROOT (holds the CA and its private key): $CAROOT"
 if [[ "$CERT_DIR" == "$ROOT_DIR/certs" ]]; then
   echo
-  echo "Next step: run 'mise run trust-ca' to import $CA_CRT into Windows"
+  echo "Next step: run 'mise run certificates:trust-ca' to import $CA_CRT into Windows"
   echo "CurrentUser\\Root (no admin required) so Windows browsers trust HTTPS from WSL2."
 fi
 echo "Optional, to also trust HTTPS from inside WSL (curl, etc.): mkcert -install"

@@ -26,6 +26,12 @@ jobs:
       - name: Certificate lifecycle regression tests
         run: ./scripts/test-generate-dev-certs.sh
 
+      - name: Certificate verification regression tests
+        run: ./scripts/test-verify-certs.sh
+
+      - name: Certificate import regression tests
+        run: ./scripts/test-import-certs-from-image.sh
+
       - name: Exposure checker regression tests
         run: ./scripts/test-check-exposure.sh
 

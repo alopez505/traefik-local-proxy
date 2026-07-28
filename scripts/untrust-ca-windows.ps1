@@ -6,7 +6,7 @@
 # but projects that share that CA will also stop trusting it.
 #
 # Run from WSL2 via:
-#   mise run untrust-ca
+#   mise run certificates:untrust-ca
 # Or directly:
 #   powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/untrust-ca-windows.ps1
 

@@ -6,6 +6,11 @@
 # Only certs/README.md is tracked.
 certs/*
 !certs/README.md
+# Explicit, belt-and-suspenders on top of the blanket rule above, so key
+# files and certificate-import staging directories are unambiguously
+# excluded even if that blanket rule ever changes.
+certs/*.key
+certs/.certificate-import.*
 
 # OS / editor noise
 .DS_Store

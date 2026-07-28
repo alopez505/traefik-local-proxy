@@ -6,11 +6,11 @@
 #  browsers reach Traefik running in WSL2 without /etc/hosts changes.
 #
 #  First-time setup:
-#    cp .env.example .env              # optional: override ports, bind addresses, log level
-#    mise run certs                    # generate local CA + wildcard cert
-#    mise run trust-ca                 # import CA into Windows CurrentUser trust store
-#    mise run up                       # start Traefik
-#    mise run demo                     # start demo service
+#    cp .env.example .env               # optional: override ports, bind addresses, log level
+#    mise run certificates:generate     # generate local CA + wildcard cert
+#    mise run certificates:trust-ca     # import CA into Windows CurrentUser trust store
+#    mise run up                        # start Traefik
+#    mise run demo                      # start demo service
 #    # Dashboard: https://proxy.localtest.me
 #
 #  Services that want Traefik routing join the shared proxy network:
@@ -93,13 +93,13 @@ services:
       # Mount only the leaf certificate and key. The copied CA certificate and
       # any unrelated files in certs/ are not needed by Traefik.
       - type: bind
-        source: ./certs/localtest.me.crt
+        source: ${TRAEFIK_CERTIFICATE_FILE:-./certs/localtest.me.crt}
         target: /etc/traefik/certs/localtest.me.crt
         read_only: true
         bind:
           create_host_path: false
       - type: bind
-        source: ./certs/localtest.me.key
+        source: ${TRAEFIK_CERTIFICATE_KEY_FILE:-./certs/localtest.me.key}
         target: /etc/traefik/certs/localtest.me.key
         read_only: true
         bind:

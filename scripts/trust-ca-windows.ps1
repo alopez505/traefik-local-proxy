@@ -3,7 +3,7 @@
 # user-scoped.
 #
 # Run from WSL2 via:
-#   mise run trust-ca
+#   mise run certificates:trust-ca
 # Or directly:
 #   powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/trust-ca-windows.ps1
 
@@ -15,7 +15,7 @@ $certPath  = [System.IO.Path]::GetFullPath($certPath)
 
 if (-not (Test-Path $certPath)) {
     Write-Error "CA certificate not found at: $certPath"
-    Write-Error "Run 'mise run certs' first to generate it."
+    Write-Error "Run 'mise run certificates:generate' first to generate it."
     exit 1
 }
 
@@ -33,4 +33,4 @@ if ($null -eq $trustedCertificate) {
 
 Write-Output "Imported: $certPath"
 Write-Output "CA is now trusted in CurrentUser\Root."
-Write-Output "To remove it later, run: mise run untrust-ca"
+Write-Output "To remove it later, run: mise run certificates:untrust-ca"
