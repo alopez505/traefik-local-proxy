@@ -131,4 +131,37 @@ if run_verify --cert "$rsa_dir/leaf.crt" --key "$rsa_dir/leaf.key" --bogus >/dev
   exit 1
 fi
 
+# 8. A flag with no value fails cleanly with a usage message, instead of an
+# unbound-variable crash under set -u.
+if run_verify --cert >"$TEST_ROOT/missing-value.out" 2>&1; then
+  echo "Expected --cert with no value to fail." >&2
+  exit 1
+fi
+if ! grep -q "Missing value for --cert" "$TEST_ROOT/missing-value.out"; then
+  echo "Expected a clear missing-value message, got:" >&2
+  cat "$TEST_ROOT/missing-value.out" >&2
+  exit 1
+fi
+
+# 9. SAN coverage must not false-positive on a substring match: a SAN of
+# exactly "notlocaltest.me" contains the substring "localtest.me" but is not
+# actually covered, so this must WARN like any other uncovered certificate.
+false_positive_dir="$TEST_ROOT/false-positive-san"
+mkdir -p "$false_positive_dir"
+openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 1 \
+  -subj "/CN=notlocaltest.me" \
+  -addext "subjectAltName=DNS:notlocaltest.me" \
+  -keyout "$false_positive_dir/leaf.key" -out "$false_positive_dir/leaf.crt" >/dev/null 2>&1
+chmod 600 "$false_positive_dir/leaf.key"
+if ! out="$(run_verify --cert "$false_positive_dir/leaf.crt" --key "$false_positive_dir/leaf.key" 2>&1)"; then
+  echo "Expected a substring-only SAN match to still pass overall (WARN, not FAIL), got:" >&2
+  echo "$out" >&2
+  exit 1
+fi
+if ! grep -q "WARN SAN coverage" <<<"$out"; then
+  echo "Expected a WARN SAN coverage line for DNS:notlocaltest.me (substring match, not a real cover), got:" >&2
+  echo "$out" >&2
+  exit 1
+fi
+
 echo "Certificate verification regression tests passed."
