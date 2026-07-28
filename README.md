@@ -129,9 +129,11 @@ commonly used IPv4 wildcard record, `*.localtest.me IN A 127.0.0.1`, resolves
 subdomains to the IPv4 loopback address. It is a convenience domain, not an
 IETF standard like `localhost`.
 
-This stack publishes Docker ports on IPv4 `127.0.0.1` only. Some resolvers also
-return IPv6 `::1`; if a browser selects IPv6 first and the request fails, use an
-IPv4-preferred resolver or configure Docker to publish the ports on IPv6 too.
+This stack publishes Docker ports on IPv4 `127.0.0.1` by default (see
+`TRAEFIK_WEB_BIND_ADDRESS`/`TRAEFIK_TCP_BIND_ADDRESS` under "Configuration").
+Some resolvers also return IPv6 `::1`; if a browser selects IPv6 first and the
+request fails, use an IPv4-preferred resolver or configure Docker to publish
+the ports on IPv6 too.
 
 Why use it instead of `*.localhost`?
 
@@ -272,9 +274,12 @@ networks:
 Start `traefik-local-proxy` first, then start the other project. The service
 will be reachable at <https://myapp.localtest.me>.
 
-> **Required network name:** The shared Traefik network must be named `proxy`.
-> Every consuming Compose project must join an external network with
-> `name: proxy`; the network name is not configurable.
+> **Required network name:** The shared Traefik network must be named `proxy`
+> by default. Every consuming Compose project must join an external network
+> with `name: proxy`. This can be overridden via the advanced
+> `TRAEFIK_NETWORK_NAME` setting (see "Configuration"), but only if every
+> already-configured consuming project's own network name changes to match -
+> otherwise discovery breaks silently for all of them.
 
 ---
 
@@ -392,12 +397,16 @@ containers exist.
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `TRAEFIK_HTTP_PORT` | `80` | Host HTTP port (bound to 127.0.0.1; redirects to HTTPS in HTTPS mode) |
-| `TRAEFIK_HTTPS_PORT` | `443` | Host HTTPS port (bound to 127.0.0.1 and included in redirects) |
-| `TRAEFIK_NEO4J_PORT` | `7687` | Neo4j TCP entrypoint (loopback-only) |
-| `TRAEFIK_MSSQL_PORT` | `1433` | MSSQL TCP entrypoint (loopback-only) |
-| `TRAEFIK_MYSQL_PORT` | `3306` | MySQL TCP entrypoint (loopback-only) |
-| `TRAEFIK_POSTGRES_PORT` | `5432` | Postgres TCP entrypoint (loopback-only) |
+| `TRAEFIK_WEB_BIND_ADDRESS` | `127.0.0.1` | Bind address for the HTTP/HTTPS ports. Widening this does not by itself make the proxy reachable from a remote device - see the exposure notes below |
+| `TRAEFIK_TCP_BIND_ADDRESS` | `127.0.0.1` | Bind address for database TCP entrypoints (see "TCP database routing"). Independent from `TRAEFIK_WEB_BIND_ADDRESS` on purpose |
+| `TRAEFIK_HTTP_PORT` | `80` | Host HTTP port (redirects to HTTPS in HTTPS mode) |
+| `TRAEFIK_HTTPS_PORT` | `443` | Host HTTPS port (included in redirects) |
+| `TRAEFIK_NETWORK_NAME` | `proxy` | **Advanced.** Docker network shared with routed projects. Changing it requires every already-configured consuming project to change too, or discovery breaks silently |
+| `TRAEFIK_DASHBOARD_ENABLED` | `true` | Set to `false` to fully disable the dashboard/API router |
+| `TRAEFIK_NEO4J_PORT` | `7687` | Neo4j TCP entrypoint |
+| `TRAEFIK_MSSQL_PORT` | `1433` | MSSQL TCP entrypoint |
+| `TRAEFIK_MYSQL_PORT` | `3306` | MySQL TCP entrypoint |
+| `TRAEFIK_POSTGRES_PORT` | `5432` | Postgres TCP entrypoint |
 | `TRAEFIK_LOG_LEVEL` | `INFO` | Log verbosity: DEBUG, INFO, WARN, ERROR |
 
 Override these settings in an optional `.env`. With non-default web ports, use
@@ -405,12 +414,33 @@ the explicit port in browser URLs—for example, `http://demo.localtest.me:8080`
 and `https://demo.localtest.me:8443`. HTTPS mode constructs its redirect using
 the published `TRAEFIK_HTTPS_PORT`.
 
-Image versions are declared directly in the Compose manifests, which are the
-authoritative source and are updated by Dependabot.
+The Traefik image version is a literal tag in the Compose manifests (not a
+variable), which keeps it the authoritative source that Dependabot updates
+automatically. To run a different image instead, add
+`docker-compose.use-custom-traefik-image.yml` to your `-f` list and set
+`TRAEFIK_IMAGE`; see that file for the exact invocation. This is an advanced,
+opt-in path - the default Quick Start always uses the pinned, tested image.
 
 The TCP database port bindings are commented out by default because they
 conflict with local installs of Neo4j, MSSQL, MySQL, and Postgres. Leave the
 relevant bindings disabled if those ports are already in use on the host.
+
+**Exposure notes:**
+
+- Widening `TRAEFIK_WEB_BIND_ADDRESS` beyond `127.0.0.1` still requires a
+  remote DNS/hosts override pointing at this machine, CA trust on the remote
+  client, and host firewall access - `*.localtest.me` resolves every client
+  to its own loopback address, not to this machine, so binding wider does not
+  by itself make anything reachable remotely.
+- Widening `TRAEFIK_TCP_BIND_ADDRESS` exposes every currently-enabled
+  database override port (see "TCP database routing") to host interfaces,
+  not just one.
+- Disable or otherwise protect the dashboard (`TRAEFIK_DASHBOARD_ENABLED=false`)
+  before widening `TRAEFIK_WEB_BIND_ADDRESS`.
+- `mise run up` and `mise run validate` print a non-blocking advisory warning
+  when either bind address resolves to something other than `127.0.0.1`. This
+  only runs on mise-managed tasks - it cannot protect a raw `docker compose up`
+  invocation.
 
 ---
 
@@ -536,7 +566,9 @@ http:
 
 ## Security notes
 
-- All ports are bound to `127.0.0.1` only - not exposed on the LAN.
+- All ports are bound to `127.0.0.1` only by default - not exposed on the LAN
+  unless you deliberately widen `TRAEFIK_WEB_BIND_ADDRESS`/`TRAEFIK_TCP_BIND_ADDRESS`
+  (see "Configuration"). Disable or protect the dashboard first if you do.
 - The dashboard is served over HTTPS through the `proxy.localtest.me` route in
   the default mode. The explicit HTTP fallback serves it over loopback HTTP.
   `api.insecure` remains disabled in both modes.

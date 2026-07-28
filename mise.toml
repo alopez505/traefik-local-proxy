@@ -11,7 +11,7 @@ mkcert = "1.4.4"
 
 [tasks.up]
 description = "Start Traefik (creates proxy network if needed)"
-run = "docker compose up -d"
+run = "./scripts/check-exposure.sh; docker compose up -d"
 
 [tasks.up-http]
 description = "Start Traefik without local TLS certificates"
@@ -82,7 +82,10 @@ docker compose --env-file .env.example config -q &&
 docker compose --env-file .env.example -f docker-compose.http.yml config -q &&
 docker compose --env-file .env.example -f examples/whoami/docker-compose.yml config -q &&
 docker compose --env-file .env.example -f examples/whoami/docker-compose.http.yml config -q &&
+TRAEFIK_IMAGE=traefik:v3.7.9 docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.use-custom-traefik-image.yml config -q &&
 ./scripts/test-generate-dev-certs.sh &&
+./scripts/test-check-exposure.sh &&
+./scripts/check-exposure.sh &&
 echo 'Validation OK'
 """
 

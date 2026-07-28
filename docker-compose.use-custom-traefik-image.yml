@@ -1,0 +1,19 @@
+# Advanced, opt-in: run a different Traefik-compatible image instead of the
+# pinned, tested, Dependabot-tracked default in docker-compose.yml. The base
+# files intentionally keep a literal image reference so Dependabot keeps
+# generating version-bump PRs; this override is the only place TRAEFIK_IMAGE
+# is read, and it is required (no default) so a missing value fails loudly
+# instead of silently falling back to the pinned default.
+#
+# Usage:
+#   TRAEFIK_IMAGE=ghcr.io/example/custom-traefik:1.0.0 \
+#   docker compose \
+#     -f docker-compose.yml \
+#     -f docker-compose.use-custom-traefik-image.yml \
+#     up -d
+#
+# Works the same way combined with docker-compose.http.yml instead.
+
+services:
+  proxy:
+    image: "${TRAEFIK_IMAGE:?Set TRAEFIK_IMAGE to a Traefik-compatible container image}"

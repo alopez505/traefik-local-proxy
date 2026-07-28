@@ -19,18 +19,20 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.allowemptyservices=true"
       - '--providers.docker.defaultrule=Host(`{{ index .Labels "traefik.hostname" }}.localtest.me`)'
-      - "--providers.docker.network=proxy"
+      - "--providers.docker.network=${TRAEFIK_NETWORK_NAME:-proxy}"
       - "--entrypoints.web.address=:80"
     depends_on:
       - socket-proxy
     labels:
-      traefik.enable: "true"
+      # Set TRAEFIK_DASHBOARD_ENABLED=false to fully disable this router - it
+      # is the only path to both the dashboard UI and the API (api@internal).
+      traefik.enable: "${TRAEFIK_DASHBOARD_ENABLED:-true}"
       traefik.http.routers.proxy.rule: "Host(`proxy.localtest.me`)"
       traefik.http.routers.proxy.entrypoints: "web"
       traefik.http.routers.proxy.tls: "false"
       traefik.http.routers.proxy.service: "api@internal"
     ports:
-      - "127.0.0.1:${TRAEFIK_HTTP_PORT:-80}:80"
+      - "${TRAEFIK_WEB_BIND_ADDRESS:-127.0.0.1}:${TRAEFIK_HTTP_PORT:-80}:80"
     networks:
       - proxy
       - socket-proxy-net
@@ -56,6 +58,6 @@ services:
 
 networks:
   proxy:
-    name: proxy
+    name: ${TRAEFIK_NETWORK_NAME:-proxy}
   socket-proxy-net:
     internal: true

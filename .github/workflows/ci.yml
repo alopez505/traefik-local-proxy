@@ -26,6 +26,9 @@ jobs:
       - name: Certificate lifecycle regression tests
         run: ./scripts/test-generate-dev-certs.sh
 
+      - name: Exposure checker regression tests
+        run: ./scripts/test-check-exposure.sh
+
       - name: Compose config (base)
         run: docker compose --env-file .env.example config -q
 
@@ -37,6 +40,9 @@ jobs:
 
       - name: Compose config (HTTP-only whoami example)
         run: docker compose --env-file .env.example -f examples/whoami/docker-compose.http.yml config -q
+
+      - name: Compose config (custom Traefik image override)
+        run: TRAEFIK_IMAGE=traefik:v3.7.9 docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.use-custom-traefik-image.yml config -q
 
   runtime-smoke:
     runs-on: ubuntu-latest
