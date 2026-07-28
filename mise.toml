@@ -116,9 +116,17 @@ echo 'Validation OK'
 """
 
 [tasks.network]
-description = "Show containers currently attached to proxy"
+description = "Show containers currently attached to the proxy network"
 run = """
-docker network inspect proxy --format '{{range .Containers}}{{println .Name}}{{end}}' 2>/dev/null || echo "proxy network not yet created (run: mise run up)"
+# Honor a TRAEFIK_NETWORK_NAME override the same way docker compose resolves
+# it: start from the .env value if present, then let a shell env var win.
+net="proxy"
+if [ -f .env ]; then
+	env_net="$(grep -E '^TRAEFIK_NETWORK_NAME=' .env | tail -1 | cut -d= -f2-)"
+	[ -n "$env_net" ] && net="$env_net"
+fi
+net="${TRAEFIK_NETWORK_NAME:-$net}"
+docker network inspect "$net" --format '{% raw %}{{range .Containers}}{{println .Name}}{{end}}{% endraw %}' 2>/dev/null || echo "$net network not yet created (run: mise run up)"
 """
 
 [tasks.demo]

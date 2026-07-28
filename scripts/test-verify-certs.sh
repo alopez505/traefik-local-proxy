@@ -164,4 +164,41 @@ if ! grep -q "WARN SAN coverage" <<<"$out"; then
   exit 1
 fi
 
+# 10. SAN coverage requires the wildcard: an apex-only "DNS:localtest.me" does
+# not cover any routed *.localtest.me subdomain, so it must WARN, not PASS.
+apex_only_dir="$TEST_ROOT/apex-only-san"
+mkdir -p "$apex_only_dir"
+openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 1 \
+  -subj "/CN=localtest.me" \
+  -addext "subjectAltName=DNS:localtest.me" \
+  -keyout "$apex_only_dir/leaf.key" -out "$apex_only_dir/leaf.crt" >/dev/null 2>&1
+chmod 600 "$apex_only_dir/leaf.key"
+if ! out="$(run_verify --cert "$apex_only_dir/leaf.crt" --key "$apex_only_dir/leaf.key" 2>&1)"; then
+  echo "Expected an apex-only certificate to still pass overall (WARN, not FAIL), got:" >&2
+  echo "$out" >&2
+  exit 1
+fi
+if ! grep -q "WARN SAN coverage" <<<"$out"; then
+  echo "Expected a WARN SAN coverage line for an apex-only DNS:localtest.me SAN, got:" >&2
+  echo "$out" >&2
+  exit 1
+fi
+
+# 11. An invalid/unreadable certificate must FAIL cleanly on expiry and still
+# run the remaining diagnostics, not abort the whole script under set -e when
+# the openssl expiry pipeline returns nonzero.
+invalid_dir="$TEST_ROOT/invalid-cert"
+gen_rsa_pair "$invalid_dir"
+printf 'not a certificate\n' >"$invalid_dir/leaf.crt"
+if run_verify --cert "$invalid_dir/leaf.crt" --key "$invalid_dir/leaf.key" >"$TEST_ROOT/invalid.out" 2>&1; then
+  echo "Expected an invalid certificate to fail overall." >&2
+  cat "$TEST_ROOT/invalid.out" >&2
+  exit 1
+fi
+if ! grep -q "FAIL expiry" "$TEST_ROOT/invalid.out"; then
+  echo "Expected a FAIL expiry line (script must not abort before it), got:" >&2
+  cat "$TEST_ROOT/invalid.out" >&2
+  exit 1
+fi
+
 echo "Certificate verification regression tests passed."

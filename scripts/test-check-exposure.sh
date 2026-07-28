@@ -77,14 +77,20 @@ if [[ "$out" != *"TRAEFIK_WEB_BIND_ADDRESS"* || "$out" != *"dashboard"* ]]; then
   exit 1
 fi
 
-# 4. Non-loopback web bind + dashboard disabled: no dashboard warning.
+# 4. Non-loopback web bind + dashboard disabled: still warns about the general
+# web exposure (routed services are reachable on the widened interface), but
+# without the dashboard-specific note.
 cat >"$TEST_ROOT/web-exposed-no-dashboard.env" <<'EOF'
 TRAEFIK_WEB_BIND_ADDRESS=0.0.0.0
 TRAEFIK_DASHBOARD_ENABLED=false
 EOF
 out="$(run_checker "$TEST_ROOT/web-exposed-no-dashboard.env" 2>&1)"
-if [[ -n "$out" ]]; then
-  echo "Expected silence when the dashboard is disabled, got: $out" >&2
+if [[ "$out" != *"TRAEFIK_WEB_BIND_ADDRESS"* ]]; then
+  echo "Expected a general web-exposure warning even with the dashboard disabled, got: $out" >&2
+  exit 1
+fi
+if [[ "$out" == *"dashboard"* ]]; then
+  echo "Did not expect a dashboard-specific note when the dashboard is disabled, got: $out" >&2
   exit 1
 fi
 
