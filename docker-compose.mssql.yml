@@ -1,0 +1,25 @@
+# Publishes the MSSQL TCP entrypoint's host port. The matching
+# `--entrypoints.mssql.address=:1433` flag is already defined
+# unconditionally in docker-compose.yml's command block; this file only adds
+# the ports: entry (Compose's ports: key is list-merged/appended across -f
+# files, unlike command:, which fully replaces).
+#
+# Publishing this port only opens the entrypoint - it does not route
+# anything by itself. An actual MSSQL container still needs its own TCP
+# router/service labels (see README "TCP database routing") to be reachable
+# through it. Raw non-TLS routing supports exactly one backend per
+# entrypoint; do not assume SNI-based multiplexing works for MSSQL the way
+# it can for Postgres - that behavior is protocol- and client-specific and
+# has not been verified here.
+#
+# Bind address is TRAEFIK_TCP_BIND_ADDRESS (default 127.0.0.1), independent
+# from the web ports' TRAEFIK_WEB_BIND_ADDRESS - widening one never silently
+# widens the other. Widening it exposes every currently-enabled database
+# override port, not just this one.
+#
+# Usage: docker compose -f docker-compose.yml -f docker-compose.mssql.yml up -d
+
+services:
+  proxy:
+    ports:
+      - "${TRAEFIK_TCP_BIND_ADDRESS:-127.0.0.1}:${TRAEFIK_MSSQL_PORT:-1433}:1433"

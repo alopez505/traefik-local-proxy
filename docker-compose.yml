@@ -79,14 +79,9 @@ services:
       # Bound to 127.0.0.1 by default - see TRAEFIK_WEB_BIND_ADDRESS.
       - "${TRAEFIK_WEB_BIND_ADDRESS:-127.0.0.1}:${TRAEFIK_HTTP_PORT:-80}:80"
       - "${TRAEFIK_WEB_BIND_ADDRESS:-127.0.0.1}:${TRAEFIK_HTTPS_PORT:-443}:443"
-      # Optional TCP entrypoints - uncomment only if you route database
-      # containers through this proxy. These ports conflict with local database
-      # installs (Neo4j, SQL Server, MySQL, Postgres); leave them commented
-      # unless you need them.
-      # - "127.0.0.1:${TRAEFIK_NEO4J_PORT:-7687}:7687"
-      # - "127.0.0.1:${TRAEFIK_MSSQL_PORT:-1433}:1433"
-      # - "127.0.0.1:${TRAEFIK_MYSQL_PORT:-3306}:3306"
-      # - "127.0.0.1:${TRAEFIK_POSTGRES_PORT:-5432}:5432"
+      # Database TCP entrypoints (Neo4j, MSSQL, MySQL, Postgres) are always
+      # defined below, but only published when the matching override file is
+      # added - see docker-compose.<db>.yml and README "TCP database routing".
     volumes:
       # Dynamic config (TLS certificates, extra routers)
       - ./dynamic:/etc/traefik/dynamic:ro
