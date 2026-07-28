@@ -35,10 +35,20 @@ EOF
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --cert)
+      if [[ -z "${2:-}" ]]; then
+        echo "Missing value for --cert" >&2
+        usage >&2
+        exit 2
+      fi
       CERT="$2"
       shift 2
       ;;
     --key)
+      if [[ -z "${2:-}" ]]; then
+        echo "Missing value for --key" >&2
+        usage >&2
+        exit 2
+      fi
       KEY="$2"
       shift 2
       ;;
@@ -94,7 +104,7 @@ fi
 
 # --- SAN coverage --------------------------------------------------------------
 san="$(openssl x509 -in "$CERT" -noout -ext subjectAltName 2>/dev/null || true)"
-if [[ "$san" == *"localtest.me"* ]]; then
+if grep -Eq 'DNS:(\*\.)?localtest\.me([,[:space:]]|$)' <<<"$san"; then
   echo "PASS SAN coverage: localtest.me is covered."
 else
   echo "WARN SAN coverage: localtest.me/*.localtest.me not found in the certificate's SAN - expected for a bring-your-own certificate covering different names, otherwise check the certificate."

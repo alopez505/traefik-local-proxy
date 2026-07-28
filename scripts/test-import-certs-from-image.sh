@@ -195,4 +195,16 @@ if run_importer fake-image:1 --cert-path /certs/valid.crt --key-path /certs/vali
   exit 1
 fi
 
+# 8. A flag with no value fails cleanly with a usage message, instead of an
+# unbound-variable crash under set -u.
+if run_importer fake-image:1 --cert-path >"$TEST_ROOT/missing-value.out" 2>&1; then
+  echo "Expected --cert-path with no value to fail." >&2
+  exit 1
+fi
+if ! grep -q "Missing value for --cert-path" "$TEST_ROOT/missing-value.out"; then
+  echo "Expected a clear missing-value message, got:" >&2
+  cat "$TEST_ROOT/missing-value.out" >&2
+  exit 1
+fi
+
 echo "Certificate import regression tests passed."

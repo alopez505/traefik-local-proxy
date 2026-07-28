@@ -47,22 +47,47 @@ EOF
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --cert-path)
+      if [[ -z "${2:-}" ]]; then
+        echo "Missing value for --cert-path" >&2
+        usage >&2
+        exit 2
+      fi
       CERT_PATH_IN_IMAGE="$2"
       shift 2
       ;;
     --key-path)
+      if [[ -z "${2:-}" ]]; then
+        echo "Missing value for --key-path" >&2
+        usage >&2
+        exit 2
+      fi
       KEY_PATH_IN_IMAGE="$2"
       shift 2
       ;;
     --dest-dir)
+      if [[ -z "${2:-}" ]]; then
+        echo "Missing value for --dest-dir" >&2
+        usage >&2
+        exit 2
+      fi
       DEST_DIR="$2"
       shift 2
       ;;
     --dest-cert)
+      if [[ -z "${2:-}" ]]; then
+        echo "Missing value for --dest-cert" >&2
+        usage >&2
+        exit 2
+      fi
       DEST_CERT="$2"
       shift 2
       ;;
     --dest-key)
+      if [[ -z "${2:-}" ]]; then
+        echo "Missing value for --dest-key" >&2
+        usage >&2
+        exit 2
+      fi
       DEST_KEY="$2"
       shift 2
       ;;
