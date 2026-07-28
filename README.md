@@ -250,10 +250,20 @@ networks:
     name: proxy
 ```
 
-> **Hostname with the default rule:** if you rely on the default rule, set
-> `traefik.hostname`. Without it, Traefik cannot generate the expected
-> `*.localtest.me` host rule. If you define an explicit router `rule`,
-> `traefik.hostname` is optional.
+> **Hostname with the default rule:** if you define an explicit router `rule`,
+> `traefik.hostname` is optional and none of the below applies. Otherwise, the
+> default rule resolves a service's `*.localtest.me` hostname in this order:
+>
+> 1. the `traefik.hostname` label, if present (always checked first, used
+>    exactly as written)
+> 2. the Compose service name, only if `TRAEFIK_FALLBACK_TO_COMPOSE_SERVICE_NAME=true`
+>    (normalized - e.g. underscores become hyphens)
+> 3. the container name, only if `TRAEFIK_FALLBACK_TO_CONTAINER_NAME=true`
+>    (also normalized)
+> 4. otherwise, no route is generated for that container at all
+>
+> Both fallback tiers default to `false` - by default you still need
+> `traefik.hostname`, same as before. See "Configuration" for both variables.
 
 **Start traefik-local-proxy first** - it creates the `proxy` network. Other
 services reference it as external and will fail to start if the network does
@@ -401,6 +411,7 @@ mise run demo-down   # stop the whoami test service
 mise run config      # validate docker-compose.yml
 mise run validate    # run pre-commit hooks + validate all compose configs
 mise run smoke       # live HTTPS/HTTP transition and custom-port checks
+mise run smoke-fallback # live hostname-fallback resolution-order checks
 mise run network     # list containers currently on proxy
 ```
 
@@ -420,6 +431,10 @@ containers exist.
 | `TRAEFIK_HTTPS_PORT` | `443` | Host HTTPS port (included in redirects) |
 | `TRAEFIK_NETWORK_NAME` | `proxy` | **Advanced.** Docker network shared with routed projects. Changing it requires every already-configured consuming project to change too, or discovery breaks silently |
 | `TRAEFIK_DASHBOARD_ENABLED` | `true` | Set to `false` to fully disable the dashboard/API router |
+| `TRAEFIK_FALLBACK_TO_COMPOSE_SERVICE_NAME` | `false` | Route `<compose-service-name>.localtest.me` when `traefik.hostname` is absent (see "Adding a service") |
+| `TRAEFIK_FALLBACK_TO_CONTAINER_NAME` | `false` | Route `<container-name>.localtest.me` when `traefik.hostname` is absent and the service-name tier above didn't match |
+| `TRAEFIK_CERTIFICATE_FILE` | `./certs/localtest.me.crt` | Certificate file the proxy mounts - point this at any cert, however it got there |
+| `TRAEFIK_CERTIFICATE_KEY_FILE` | `./certs/localtest.me.key` | Matching private key file |
 | `TRAEFIK_NEO4J_PORT` | `7687` | Neo4j TCP entrypoint |
 | `TRAEFIK_MSSQL_PORT` | `1433` | MSSQL TCP entrypoint |
 | `TRAEFIK_MYSQL_PORT` | `3306` | MySQL TCP entrypoint |

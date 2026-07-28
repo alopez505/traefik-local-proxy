@@ -49,7 +49,13 @@ services:
       - "--providers.docker.endpoint=tcp://socket-proxy:2375"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.allowemptyservices=true"
-      - '--providers.docker.defaultrule=Host(`{{ index .Labels "traefik.hostname" }}.localtest.me`)'
+      # Hostname resolution order: traefik.hostname label (always checked
+      # first) -> Compose service name if TRAEFIK_FALLBACK_TO_COMPOSE_SERVICE_NAME=true
+      # -> container name if TRAEFIK_FALLBACK_TO_CONTAINER_NAME=true -> no
+      # route. Fallback tiers are normalized (normalize); an explicit
+      # traefik.hostname label never is. This exact string must stay
+      # identical in docker-compose.http.yml - see the CI parity check.
+      - '--providers.docker.defaultrule={{ if index .Labels "traefik.hostname" }}Host(`{{ index .Labels "traefik.hostname" }}.localtest.me`){{ else if and (eq "${TRAEFIK_FALLBACK_TO_COMPOSE_SERVICE_NAME:-false}" "true") (index .Labels "com.docker.compose.service") }}Host(`{{ normalize (index .Labels "com.docker.compose.service") }}.localtest.me`){{ else if and (eq "${TRAEFIK_FALLBACK_TO_CONTAINER_NAME:-false}" "true") (trimPrefix "/" .ContainerName) }}Host(`{{ normalize (trimPrefix "/" .ContainerName) }}.localtest.me`){{ else }}{{ end }}'
       - "--providers.docker.network=${TRAEFIK_NETWORK_NAME:-proxy}"
       - "--providers.file.directory=/etc/traefik/dynamic"
       - "--providers.file.watch=true"
