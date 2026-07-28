@@ -392,6 +392,7 @@ below. `mise run validate` is fully self-contained - no system-level
 ```text
 mise run up          # start Traefik + create proxy network
 mise run up-http     # start Traefik without local TLS certificates
+mise run up-without-http-to-https-redirect  # advanced: HTTPS mode, redirect disabled
 mise run stop        # stop Traefik, keep proxy network
 mise run down        # stop Traefik and remove proxy if no other containers use it
 mise run restart     # restart Traefik process; use up to apply config changes
@@ -452,6 +453,15 @@ automatically. To run a different image instead, add
 `docker-compose.use-custom-traefik-image.yml` to your `-f` list and set
 `TRAEFIK_IMAGE`; see that file for the exact invocation. This is an advanced,
 opt-in path - the default Quick Start always uses the pinned, tested image.
+
+The automatic HTTP-to-HTTPS redirect has no on/off env var - Traefik has no
+boolean flag for it, the mere presence of the redirect flags is what enables
+it, and Compose's `command:` key fully replaces (not merges) across `-f`
+files, so there is no way to toggle just those flags with a variable. To
+disable it, use `mise run up-without-http-to-https-redirect`, or add
+`docker-compose.disable-http-to-https-redirect.yml` to your `-f` list
+directly. A CI check keeps that file in sync with docker-compose.yml's
+command list.
 
 The TCP database ports are not published by default because they conflict
 with local installs of Neo4j, MSSQL, MySQL, and Postgres - each is only

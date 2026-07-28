@@ -17,6 +17,10 @@ run = "./scripts/check-exposure.sh; docker compose up -d"
 description = "Start Traefik without local TLS certificates"
 run = "docker compose -f docker-compose.http.yml up -d"
 
+[tasks.up-without-http-to-https-redirect]
+description = "Start Traefik with the HTTP-to-HTTPS redirect disabled (advanced, opt-in)"
+run = "./scripts/check-exposure.sh; docker compose -f docker-compose.yml -f docker-compose.disable-http-to-https-redirect.yml up -d"
+
 [tasks.down]
 description = "Stop Traefik and remove the compose-owned proxy network"
 run = "docker compose down"
@@ -101,6 +105,8 @@ docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.p
 docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.mysql.yml config -q &&
 docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.neo4j.yml config -q &&
 ./scripts/lib/compose-config-diff.sh '.services.proxy.command[] | select(startswith("--providers.docker.defaultrule="))' -- --env-file .env.example -f docker-compose.yml -- --env-file .env.example -f docker-compose.http.yml &&
+docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.disable-http-to-https-redirect.yml config -q &&
+./scripts/test-redirect-override-parity.sh &&
 ./scripts/test-generate-dev-certs.sh &&
 ./scripts/test-verify-certs.sh &&
 ./scripts/test-import-certs-from-image.sh &&
