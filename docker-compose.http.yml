@@ -5,7 +5,7 @@
 services:
   proxy:
     image: traefik:v3.7.9
-    container_name: traefik-local
+    container_name: proxy
     restart: unless-stopped
     command:
       - "--global.sendanonymoususage=false"

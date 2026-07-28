@@ -32,7 +32,7 @@ services:
     # Deliberately pinned and tested here, not an arbitrary version. Bump only
     # after `mise run validate` and `mise run smoke` pass against the new tag.
     image: traefik:v3.7.9
-    container_name: traefik-local
+    container_name: proxy
     restart: unless-stopped
     # Traefik treats file, CLI, and environment install configuration as
     # mutually exclusive sources, so keep this service CLI-only.

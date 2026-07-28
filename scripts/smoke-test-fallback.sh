@@ -91,7 +91,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-refuse_if_containers_exist traefik-local traefik-socket-proxy "$SVC_CONTAINER" "$UNDERSCORE_CONTAINER" "$EXPLICIT_CONTAINER"
+refuse_if_containers_exist proxy traefik-socket-proxy "$SVC_CONTAINER" "$UNDERSCORE_CONTAINER" "$EXPLICIT_CONTAINER"
 refuse_if_network_exists proxy
 
 if [[ -f "$CRT" && -f "$KEY" ]]; then
@@ -125,12 +125,12 @@ echo "Starting proxy (both fallback flags false) and fixtures..."
 export TRAEFIK_FALLBACK_TO_COMPOSE_SERVICE_NAME=false
 export TRAEFIK_FALLBACK_TO_CONTAINER_NAME=false
 proxy up -d
-wait_for_health traefik-local
+wait_for_health proxy
 fixture up -d
 
 echo "Regression: explicit traefik.hostname always wins, regardless of flags..."
 # shellcheck disable=SC2046
-wait_for_url traefik-local "$(explicit_url)" $(resolve_args fallback-explicit-wins.localtest.me)
+wait_for_url proxy "$(explicit_url)" $(resolve_args fallback-explicit-wins.localtest.me)
 # shellcheck disable=SC2046
 assert_status 200 "$(explicit_url)" $(resolve_args fallback-explicit-wins.localtest.me)
 # shellcheck disable=SC2046
@@ -146,9 +146,9 @@ echo "Flags 10 (Compose service name only)..."
 export TRAEFIK_FALLBACK_TO_COMPOSE_SERVICE_NAME=true
 export TRAEFIK_FALLBACK_TO_CONTAINER_NAME=false
 proxy up -d
-wait_for_health traefik-local
+wait_for_health proxy
 # shellcheck disable=SC2046
-wait_for_url traefik-local "$(svc_url)" $(resolve_args svcname.localtest.me)
+wait_for_url proxy "$(svc_url)" $(resolve_args svcname.localtest.me)
 # shellcheck disable=SC2046
 assert_status 200 "$(svc_url)" $(resolve_args svcname.localtest.me)
 # shellcheck disable=SC2046
@@ -156,7 +156,7 @@ assert_status 404 "$(svc_container_url)" $(resolve_args "${SVC_CONTAINER}.localt
 
 echo "Normalization: my_underscore_svc routes as my-underscore-svc, not as-is..."
 # shellcheck disable=SC2046
-wait_for_url traefik-local "$(underscore_url)" $(resolve_args my-underscore-svc.localtest.me)
+wait_for_url proxy "$(underscore_url)" $(resolve_args my-underscore-svc.localtest.me)
 # shellcheck disable=SC2046
 assert_status 200 "$(underscore_url)" $(resolve_args my-underscore-svc.localtest.me)
 # shellcheck disable=SC2046
@@ -166,11 +166,11 @@ echo "Flags 01 (container name only)..."
 export TRAEFIK_FALLBACK_TO_COMPOSE_SERVICE_NAME=false
 export TRAEFIK_FALLBACK_TO_CONTAINER_NAME=true
 proxy up -d
-wait_for_health traefik-local
+wait_for_health proxy
 # shellcheck disable=SC2046
 assert_status 404 "$(svc_url)" $(resolve_args svcname.localtest.me)
 # shellcheck disable=SC2046
-wait_for_url traefik-local "$(svc_container_url)" $(resolve_args "${SVC_CONTAINER}.localtest.me")
+wait_for_url proxy "$(svc_container_url)" $(resolve_args "${SVC_CONTAINER}.localtest.me")
 # shellcheck disable=SC2046
 assert_status 200 "$(svc_container_url)" $(resolve_args "${SVC_CONTAINER}.localtest.me")
 
@@ -178,9 +178,9 @@ echo "Flags 11 (both true): Compose service name tier wins..."
 export TRAEFIK_FALLBACK_TO_COMPOSE_SERVICE_NAME=true
 export TRAEFIK_FALLBACK_TO_CONTAINER_NAME=true
 proxy up -d
-wait_for_health traefik-local
+wait_for_health proxy
 # shellcheck disable=SC2046
-wait_for_url traefik-local "$(svc_url)" $(resolve_args svcname.localtest.me)
+wait_for_url proxy "$(svc_url)" $(resolve_args svcname.localtest.me)
 # shellcheck disable=SC2046
 assert_status 200 "$(svc_url)" $(resolve_args svcname.localtest.me)
 # shellcheck disable=SC2046
