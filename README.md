@@ -438,9 +438,11 @@ automatically. To run a different image instead, add
 `TRAEFIK_IMAGE`; see that file for the exact invocation. This is an advanced,
 opt-in path - the default Quick Start always uses the pinned, tested image.
 
-The TCP database port bindings are commented out by default because they
-conflict with local installs of Neo4j, MSSQL, MySQL, and Postgres. Leave the
-relevant bindings disabled if those ports are already in use on the host.
+The TCP database ports are not published by default because they conflict
+with local installs of Neo4j, MSSQL, MySQL, and Postgres - each is only
+published by adding its own `docker-compose.<db>.yml` override file (see
+"TCP database routing"). Leave the relevant override file out if that port is
+already in use on the host.
 
 **Exposure notes:**
 
@@ -463,16 +465,20 @@ relevant bindings disabled if those ports are already in use on the host.
 
 ## TCP database routing (optional)
 
-The HTTPS Compose command defines TCP entrypoints for Neo4j (7687), MSSQL
-(1433), MySQL (3306), and Postgres (5432), but **the matching port bindings in
-`docker-compose.yml` are commented out by default**. Uncomment only the ports
-you need and only when you are routing a single database service through each
-entrypoint. Those ports commonly conflict with local database installs. For
-the normal multi-project setup, use private project networking and optional
-per-project loopback bindings as described above.
+The HTTPS Compose command always defines TCP entrypoints for Neo4j (7687),
+MSSQL (1433), MySQL (3306), and Postgres (5432), but **none of their host
+ports are published unless you add the matching override file** to your `-f`
+list: `docker-compose.neo4j.yml`, `docker-compose.mssql.yml`,
+`docker-compose.mysql.yml`, `docker-compose.postgres.yml`. There is nothing
+to uncomment in `docker-compose.yml` - add only the override files you need:
 
-For example, to route a Postgres container, uncomment the Postgres host-port
-binding in `docker-compose.yml`, then add these labels to the database service:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
+```
+
+Publishing a port only opens the entrypoint - it does not route anything by
+itself. An actual database container still needs its own TCP router/service
+labels, for example:
 
 ```yaml
 services:
@@ -491,10 +497,27 @@ networks:
     name: proxy
 ```
 
-Connect the client to `127.0.0.1:${TRAEFIK_POSTGRES_PORT:-5432}`. Repeat the
-pattern with the matching entrypoint and container port for the other database
-types. This is raw TCP forwarding; TLS, authentication, and encryption remain
-the responsibility of the database protocol and client.
+Connect the client to `${TRAEFIK_TCP_BIND_ADDRESS:-127.0.0.1}:${TRAEFIK_POSTGRES_PORT:-5432}`.
+Repeat the pattern with the matching entrypoint and container port for the
+other database types. Those ports commonly conflict with local database
+installs; for the normal multi-project setup, use private project networking
+and optional per-project loopback bindings as described above instead.
+
+**Read this before assuming any database can share an entrypoint by
+hostname.** A raw, non-TLS `HostSNI(\`*\`)` rule like the one above supports
+exactly **one backend per entrypoint** - it cannot distinguish between
+several Postgres (or several MSSQL, MySQL, or Neo4j) containers on the same
+port. Traefik does support routing by SNI after a client's TLS/STARTTLS
+negotiation for some protocols - it explicitly documents this for Postgres,
+provided the client uses a compatible `sslmode` - but this is
+protocol-and-client-specific behavior, not a general Traefik capability.
+**Do not assume it generalizes to MSSQL, MySQL, or Neo4j** without testing
+that protocol's own TLS/negotiation handshake; each override file's own
+header comment repeats this caveat. See [Traefik's TCP TLS routing
+documentation](https://doc.traefik.io/traefik/reference/routing-configuration/tcp/tls/)
+for the mechanism this depends on. Beyond that, this is raw TCP forwarding:
+authentication and encryption remain entirely the responsibility of the
+database protocol and client.
 
 ---
 

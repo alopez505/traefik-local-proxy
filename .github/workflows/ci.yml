@@ -50,6 +50,18 @@ jobs:
       - name: Compose config (custom Traefik image override)
         run: TRAEFIK_IMAGE=traefik:v3.7.9 docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.use-custom-traefik-image.yml config -q
 
+      - name: Compose config (MSSQL override)
+        run: docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.mssql.yml config -q
+
+      - name: Compose config (Postgres override)
+        run: docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.postgres.yml config -q
+
+      - name: Compose config (MySQL override)
+        run: docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.mysql.yml config -q
+
+      - name: Compose config (Neo4j override)
+        run: docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.neo4j.yml config -q
+
   runtime-smoke:
     runs-on: ubuntu-latest
     needs: validate

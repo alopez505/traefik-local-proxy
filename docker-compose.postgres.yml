@@ -1,0 +1,25 @@
+# Publishes the Postgres TCP entrypoint's host port. The matching
+# `--entrypoints.postgres.address=:5432` flag is already defined
+# unconditionally in docker-compose.yml's command block; this file only adds
+# the ports: entry (Compose's ports: key is list-merged/appended across -f
+# files, unlike command:, which fully replaces).
+#
+# Publishing this port only opens the entrypoint - it does not route
+# anything by itself. An actual Postgres container still needs its own TCP
+# router/service labels (see README "TCP database routing") to be reachable
+# through it. Raw non-TLS routing supports exactly one backend per
+# entrypoint; Traefik does support routing by SNI after Postgres's own
+# STARTTLS/SSL negotiation with a compatible client sslmode, but that is
+# Postgres-specific and should not be assumed for other database protocols.
+#
+# Bind address is TRAEFIK_TCP_BIND_ADDRESS (default 127.0.0.1), independent
+# from the web ports' TRAEFIK_WEB_BIND_ADDRESS - widening one never silently
+# widens the other. Widening it exposes every currently-enabled database
+# override port, not just this one.
+#
+# Usage: docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
+
+services:
+  proxy:
+    ports:
+      - "${TRAEFIK_TCP_BIND_ADDRESS:-127.0.0.1}:${TRAEFIK_POSTGRES_PORT:-5432}:5432"
