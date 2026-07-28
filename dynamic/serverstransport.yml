@@ -1,0 +1,14 @@
+# Named, opt-in serversTransport for backends with a self-signed or
+# otherwise untrusted HTTPS certificate. Defining this here does nothing on
+# its own - insecureSkipVerify only takes effect for a service that
+# explicitly opts in via both labels:
+#
+#   traefik.http.services.<name>.loadbalancer.server.scheme: "https"
+#   traefik.http.services.<name>.loadbalancer.serverstransport: "skip-backend-certificate-verification@file"
+#
+# See README "Backend TLS compatibility" before using this - it weakens
+# certificate verification between Traefik and that one backend.
+http:
+  serversTransports:
+    skip-backend-certificate-verification:
+      insecureSkipVerify: true

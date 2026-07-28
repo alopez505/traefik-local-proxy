@@ -21,6 +21,12 @@ services:
       - '--providers.docker.defaultrule=Host(`{{ index .Labels "traefik.hostname" }}.localtest.me`)'
       - "--providers.docker.network=${TRAEFIK_NETWORK_NAME:-proxy}"
       - "--entrypoints.web.address=:80"
+      # Single-file dynamic config, unlike the HTTPS mode's whole-directory
+      # provider - HTTP-only mode has no TLS to configure, so only the
+      # backend-TLS-compatibility transport (see README "Backend TLS
+      # compatibility") is loaded here, never dynamic/tls.yml.
+      - "--providers.file.filename=/etc/traefik/dynamic/serverstransport.yml"
+      - "--providers.file.watch=true"
     depends_on:
       - socket-proxy
     labels:
@@ -33,6 +39,13 @@ services:
       traefik.http.routers.proxy.service: "api@internal"
     ports:
       - "${TRAEFIK_WEB_BIND_ADDRESS:-127.0.0.1}:${TRAEFIK_HTTP_PORT:-80}:80"
+    volumes:
+      - type: bind
+        source: ./dynamic/serverstransport.yml
+        target: /etc/traefik/dynamic/serverstransport.yml
+        read_only: true
+        bind:
+          create_host_path: false
     networks:
       - proxy
       - socket-proxy-net
