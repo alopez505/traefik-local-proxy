@@ -125,11 +125,20 @@ fi
 DEST_CERT="${DEST_CERT:-$DEST_DIR/imported.crt}"
 DEST_KEY="${DEST_KEY:-$DEST_DIR/imported.key}"
 
+# Create the destination directories up front so the paths below can be
+# canonicalized (pwd -P needs the directory to exist).
+mkdir -p "$DEST_DIR" "$(dirname "$DEST_CERT")" "$(dirname "$DEST_KEY")"
+
 # Reject identical destinations before pulling or writing anything: otherwise
 # the cert move succeeds, the key move overwrites it, and the script reports a
 # successful pair while leaving only private-key content at that path.
-if [[ "$DEST_CERT" == "$DEST_KEY" ]]; then
-  echo "Destination certificate and key must be different paths (both resolve to: $DEST_CERT)." >&2
+# Canonicalize both paths first (via pwd -P, portable unlike GNU realpath) so
+# aliases like certs/pair.pem and certs/../certs/pair.pem cannot bypass it.
+canon_dest() {
+  printf '%s/%s\n' "$(cd "$(dirname "$1")" && pwd -P)" "$(basename "$1")"
+}
+if [[ "$(canon_dest "$DEST_CERT")" == "$(canon_dest "$DEST_KEY")" ]]; then
+  echo "Destination certificate and key must be different paths (both resolve to: $(canon_dest "$DEST_CERT"))." >&2
   usage >&2
   exit 2
 fi
@@ -140,8 +149,6 @@ if [[ ( -e "$DEST_CERT" || -e "$DEST_KEY" ) && "$FORCE" -ne 1 ]]; then
   [[ -e "$DEST_KEY" ]] && echo "  $DEST_KEY" >&2
   exit 1
 fi
-
-mkdir -p "$DEST_DIR" "$(dirname "$DEST_CERT")" "$(dirname "$DEST_KEY")"
 
 echo "Pulling $IMAGE..."
 docker pull "$IMAGE"
@@ -165,7 +172,14 @@ docker cp "$CONTAINER_ID:$CERT_PATH_IN_IMAGE" "$STAGE_DIR/cert"
 docker cp "$CONTAINER_ID:$KEY_PATH_IN_IMAGE" "$STAGE_DIR/key"
 
 chmod 644 "$STAGE_DIR/cert" 2>/dev/null || true
-chmod 600 "$STAGE_DIR/key" 2>/dev/null || true
+# The key's 600 mode is a security guarantee, not cosmetic: if the filesystem
+# can't apply it, fail rather than install a key with the image's own (possibly
+# world-readable) permissions. The staged key is cleaned up on exit, so nothing
+# is installed.
+if ! chmod 600 "$STAGE_DIR/key"; then
+  echo "Refusing to install: could not restrict the imported key to mode 600." >&2
+  exit 1
+fi
 
 if ! openssl x509 -in "$STAGE_DIR/cert" -noout -enddate >/dev/null 2>&1; then
   echo "Refusing to install: the imported certificate file is not a valid certificate." >&2

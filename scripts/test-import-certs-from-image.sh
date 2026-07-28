@@ -227,4 +227,24 @@ if [[ -e "$dest_same/same.pem" ]]; then
   exit 1
 fi
 
+# 10. Alias destination paths that canonicalize to the same file are rejected
+# too - a plain string comparison would miss dir/pair.pem vs dir/../dir/pair.pem
+# and let the key overwrite the cert under a false success.
+dest_alias="$TEST_ROOT/dest-alias"
+mkdir -p "$dest_alias"
+if run_importer fake-image:1 --cert-path /certs/valid.crt --key-path /certs/valid.key \
+  --dest-cert "$dest_alias/pair.pem" --dest-key "$dest_alias/../dest-alias/pair.pem" >"$TEST_ROOT/alias-dest.out" 2>&1; then
+  echo "Expected alias paths resolving to the same file to be rejected." >&2
+  exit 1
+fi
+if ! grep -q "must be different paths" "$TEST_ROOT/alias-dest.out"; then
+  echo "Expected an identical-destination rejection for alias paths, got:" >&2
+  cat "$TEST_ROOT/alias-dest.out" >&2
+  exit 1
+fi
+if [[ -e "$dest_alias/pair.pem" ]]; then
+  echo "Expected nothing to be written when alias destinations collide." >&2
+  exit 1
+fi
+
 echo "Certificate import regression tests passed."
