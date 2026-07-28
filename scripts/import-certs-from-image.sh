@@ -171,6 +171,17 @@ STAGE_DIR="$(mktemp -d "${DEST_DIR%/}/.certificate-import.XXXXXX")"
 docker cp "$CONTAINER_ID:$CERT_PATH_IN_IMAGE" "$STAGE_DIR/cert"
 docker cp "$CONTAINER_ID:$KEY_PATH_IN_IMAGE" "$STAGE_DIR/key"
 
+# docker cp preserves symlinks from the (untrusted) source image. An absolute
+# symlink would resolve against the host from here, so a later chmod, openssl
+# read, or mv could touch an arbitrary host file. Reject anything that is not a
+# plain regular file before either staged path is accessed.
+for staged in "$STAGE_DIR/cert" "$STAGE_DIR/key"; do
+  if [[ -L "$staged" || ! -f "$staged" ]]; then
+    echo "Refusing to install: imported path '$staged' is a symlink or not a regular file." >&2
+    exit 1
+  fi
+done
+
 chmod 644 "$STAGE_DIR/cert" 2>/dev/null || true
 # The key's 600 mode is a security guarantee, not cosmetic: if the filesystem
 # can't apply it, fail rather than install a key with the image's own (possibly
@@ -208,6 +219,15 @@ fi
 
 install_failed=0
 if ! mv -f "$STAGE_DIR/cert" "$DEST_CERT"; then
+  install_failed=1
+elif [[ "$DEST_KEY" -ef "$DEST_CERT" ]]; then
+  # The key destination resolves to the certificate we just wrote (e.g. a
+  # case-insensitive filesystem where Pair.pem and pair.pem are one file, or a
+  # symlinked destination directory). The earlier string guard can't see this
+  # because it doesn't know the destination filesystem's case sensitivity, so
+  # catch it here at the device+inode level and roll back rather than let the
+  # key clobber the certificate under a false success.
+  echo "Refusing to install: the key destination resolves to the same file as the certificate ($DEST_CERT)." >&2
   install_failed=1
 elif ! mv -f "$STAGE_DIR/key" "$DEST_KEY"; then
   install_failed=1
