@@ -550,10 +550,53 @@ Key install settings in the Compose commands:
 - `docker-compose.yml` sets the Docker provider endpoint and the shared
   network (`proxy` by default, `TRAEFIK_NETWORK_NAME`) with CLI flags. It
   also sets the redirect target to the externally published HTTPS port.
-- `providers.file` watches `dynamic/` for hot-reload of TLS config.
+- `providers.file` watches `dynamic/` for hot-reload. HTTPS mode watches the
+  whole directory (TLS config plus the backend-TLS-compatibility transport
+  below); HTTP-only mode loads only the single transport file, since it has
+  no TLS config to hot-reload.
 - `entrypoints.web` redirects HTTP to HTTPS temporarily in HTTPS mode.
 - `api.insecure=false` - the dashboard is exposed only through a labeled
   router: TLS in the default mode and loopback-only HTTP in HTTP mode.
+
+---
+
+## Backend TLS compatibility
+
+Some backend services present a self-signed or otherwise untrusted HTTPS
+certificate. Rather than a global bypass, this repo ships one named,
+inert-by-default `serversTransport` in
+[`dynamic/serverstransport.yml`](./dynamic/serverstransport.yml):
+
+```yaml
+http:
+  serversTransports:
+    skip-backend-certificate-verification:
+      insecureSkipVerify: true
+```
+
+`insecureSkipVerify: true` weakens certificate verification **between
+Traefik and that one backend** - it does nothing on its own, and is safer
+than a global bypass only because each service must opt in individually, not
+because it's free. A service opts in with **both** of these labels:
+
+```yaml
+traefik.http.services.example.loadbalancer.server.scheme: "https"
+traefik.http.services.example.loadbalancer.serverstransport: "skip-backend-certificate-verification@file"
+```
+
+`server.scheme: "https"` is required alongside the transport reference -
+without it, Traefik's port-based scheme inference may never attempt HTTPS to
+the backend at all, making the transport reference alone insufficient.
+
+This works in both proxy modes. In HTTPS mode the whole `dynamic/` directory
+is mounted and watched, same as the TLS config. In HTTP-only mode, only
+`dynamic/serverstransport.yml` itself is mounted and loaded via
+`--providers.file.filename` (not `--providers.file.directory` - HTTP-only
+mode has no TLS store to configure, so `dynamic/tls.yml` is never loaded
+there).
+
+A healthy `--ping` healthcheck only proves Traefik itself is running - it
+does not prove this file parsed or the named transport actually registered.
 
 ---
 
@@ -623,6 +666,10 @@ http:
   trusted certificates for that CA scope. Treat it as a secret.
 - Do not use client, project, or employer names as `localtest.me` subdomains
   on a work network. Use generic names (e.g. `demo`, `api`, `app`).
+- Backend HTTPS certificate verification is never bypassed globally. The
+  named `skip-backend-certificate-verification` transport (see "Backend TLS
+  compatibility") is inert until a specific service opts in via its own
+  labels.
 
 ---
 
