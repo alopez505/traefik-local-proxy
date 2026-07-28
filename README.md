@@ -27,20 +27,20 @@ not generate certificates or modify the Windows trust store.
 ### HTTPS mode (default)
 
 ```bash
-mise install            # install pinned tools (mkcert, uv)
-cp .env.example .env    # optional: override ports or log level
-mise run certs          # generate the wildcard cert via mkcert (skips if present)
-mise run trust-ca       # import the CA into Windows CurrentUser\Root (WSL2 -> Windows)
-mise run up             # start Traefik
-mise run demo           # start whoami test service -> https://demo.localtest.me
-mise run demo-down      # remove the demo container after testing
+mise install                     # install pinned tools (mkcert, uv)
+cp .env.example .env             # optional: override ports or log level
+mise run certificates:generate   # generate the wildcard cert via mkcert (skips if present)
+mise run certificates:trust-ca   # import the CA into Windows CurrentUser\Root (WSL2 -> Windows)
+mise run up                      # start Traefik
+mise run demo                    # start whoami test service -> https://demo.localtest.me
+mise run demo-down               # remove the demo container after testing
 ```
 
 Dashboard: <https://proxy.localtest.me>
 
 Certificates are generated with [mkcert](https://github.com/FiloSottile/mkcert),
 which is pinned in `mise.toml` and installed by `mise install`. mkcert keeps its
-CA in its own CAROOT outside the repo; `mise run trust-ca` then imports the CA
+CA in its own CAROOT outside the repo; `mise run certificates:trust-ca` then imports the CA
 certificate into the Windows trust store so Windows browsers trust the HTTPS
 that Traefik serves from WSL2.
 
@@ -106,7 +106,7 @@ flowchart LR
   Static["docker-compose.yml<br/>install configuration"] --> T["Traefik"]
   Dyn["dynamic/tls.yml<br/>hot-reloaded"] --> T
   Certs["certs/<br/>leaf certificate + key"] --> Dyn
-  CACopy["certs/ca.crt<br/>CA copy"] -->|"mise run trust-ca"| Trust["Windows trust store"]
+  CACopy["certs/ca.crt<br/>CA copy"] -->|"mise run certificates:trust-ca"| Trust["Windows trust store"]
   T -->|"filtered Docker API<br/>tcp://socket-proxy:2375"| S["socket-proxy"]
   S <-->|"read-only Docker API<br/>/var/run/docker.sock"| D["Docker Engine"]
   S -->|"container metadata<br/>labels, networks, events"| T
@@ -160,24 +160,24 @@ See the DNS-privacy note in the Certificate setup section below.
 2. Import `certs/ca.crt` into the Windows trust store - **no admin required**:
 
    ```bash
-   mise run trust-ca
+   mise run certificates:trust-ca
    ```
 
    This invokes `scripts/trust-ca-windows.ps1`, which imports into
-   `Cert:\CurrentUser\Root`. To remove it later: `mise run untrust-ca`.
+   `Cert:\CurrentUser\Root`. To remove it later: `mise run certificates:untrust-ca`.
 
-> **Important:** `mise run untrust-ca` removes only the root certificate that
+> **Important:** `mise run certificates:untrust-ca` removes only the root certificate that
 > matches `certs/ca.crt`. mkcert normally shares one CA across projects for a
 > user profile, so other projects using that same CA will stop trusting it.
 
 Because `--force` reuses the same mkcert CA, you do not need to re-run
-`mise run trust-ca` after regenerating the leaf. If mkcert's CAROOT changes or
+`mise run certificates:trust-ca` after regenerating the leaf. If mkcert's CAROOT changes or
 its CA is reset, the generator refuses to overwrite `certs/ca.crt`—even with
 `--force`—because that file is required to identify the exact old trusted root.
 Use the guarded rotation workflow instead:
 
 ```bash
-mise run replace-ca
+mise run certificates:replace-ca
 ```
 
 It removes the old CA from Windows `CurrentUser\Root`, verifies the removal,
@@ -189,6 +189,21 @@ identifier for the trusted root.
 
 Then start Traefik and open <https://proxy.localtest.me>.
 
+**Using a different certificate.** The proxy only ever reads whatever
+`TRAEFIK_CERTIFICATE_FILE`/`TRAEFIK_CERTIFICATE_KEY_FILE` point at (see
+"Configuration") - it does not care how the files got there. To bring your
+own certificate (from internal PKI, another CA, etc.), just point those two
+variables at your files in `.env`. To import a certificate/key pair out of a
+container image instead - without ever starting that image - run:
+
+```bash
+mise run certificates:import-from-image -- IMAGE --cert-path PATH --key-path PATH
+```
+
+Run `mise run certificates:verify` after either path to check expiry, SAN
+coverage, that the certificate and key actually match, chain structure, and
+key file permissions.
+
 > **Work / managed devices:** Installing a custom root CA may be against your
 > IT policy and can trigger endpoint security tooling. Confirm it is allowed
 > before trusting `ca.crt` on a corporate machine.
@@ -198,7 +213,7 @@ Then start Traefik and open <https://proxy.localtest.me>.
 > employer names as subdomains on a work network. Use generic names like
 > `api.localtest.me`, `demo.localtest.me`, `app.localtest.me`.
 >
-> **Team setup (onboarding):** Every developer runs `mise run certs`, which uses
+> **Team setup (onboarding):** Every developer runs `mise run certificates:generate`, which uses
 > mkcert to create their **own** local CA (stored in their own mkcert CAROOT) and
 > sign their own leaf. Never share that CA around for the whole team to trust:
 > whoever holds a CA private key that other machines trust can mint trusted
@@ -206,7 +221,7 @@ Then start Traefik and open <https://proxy.localtest.me>.
 > the CA key in CAROOT, outside the repo, and `certs/` is gitignored (with the
 > pre-commit / CI gitleaks hooks as a backstop), so the CA private key never
 > leaves the machine that created it. When you re-image or hand off a machine,
-> run `mise run untrust-ca` first.
+> run `mise run certificates:untrust-ca` first.
 
 ---
 
@@ -374,10 +389,12 @@ mise run logs        # follow Traefik logs
 mise run ps          # show service status
 mise run update      # pull images + apply the HTTPS configuration
 mise run update-http # pull images + apply the HTTP-only configuration
-mise run certs       # generate the wildcard cert via mkcert (skips if already present)
-mise run replace-ca  # untrust old Windows CA, replace it, and trust the new CA
-mise run trust-ca    # import CA into Windows CurrentUser trust store (WSL2 → Windows)
-mise run untrust-ca  # remove dev CA from Windows CurrentUser trust store
+mise run certificates:generate            # generate the wildcard cert via mkcert (skips if already present)
+mise run certificates:verify              # verify the configured cert/key: expiry, SAN, pairing, chain, permissions
+mise run certificates:import-from-image   # import a cert/key pair from a container image without starting it
+mise run certificates:replace-ca          # untrust old Windows CA, replace it, and trust the new CA
+mise run certificates:trust-ca            # import CA into Windows CurrentUser trust store (WSL2 → Windows)
+mise run certificates:untrust-ca          # remove dev CA from Windows CurrentUser trust store
 mise run demo        # start whoami test service at https://demo.localtest.me
 mise run demo-http   # start whoami test service at http://demo.localtest.me
 mise run demo-down   # stop the whoami test service
@@ -495,20 +512,21 @@ file provider, or certificate mount.
 Dynamic TLS configuration lives in
 [`dynamic/tls.yml`](./dynamic/tls.yml).
 
-The HTTPS Compose file mounts `dynamic/` read-only and mounts only
-`certs/localtest.me.crt` and `certs/localtest.me.key` at their exact container
-paths. Traefik does not receive `certs/ca.crt` or any unrelated file that may
-exist in `certs/`. The checked-in `tls.yml` expects those exact leaf filenames.
-HTTP-only mode does not mount or load the dynamic directory or certificate
-files.
+The HTTPS Compose file mounts `dynamic/` read-only and mounts only the files
+referenced by `TRAEFIK_CERTIFICATE_FILE`/`TRAEFIK_CERTIFICATE_KEY_FILE`
+(default `certs/localtest.me.crt`/`certs/localtest.me.key`) at their exact
+container paths. Traefik does not receive `certs/ca.crt` or any unrelated
+file that may exist in `certs/`. The checked-in `tls.yml` expects those exact
+leaf filenames regardless of which host files back them. HTTP-only mode does
+not mount or load the dynamic directory or certificate files.
 
 Key install settings in the Compose commands:
 
 - `providers.docker.defaultRule` generates routes from `traefik.hostname`
   labels without explicit `Host()` rules in every label set.
-- `docker-compose.yml` sets the Docker provider endpoint and fixed `proxy`
-  network with CLI flags. It also sets the redirect target to the externally
-  published HTTPS port.
+- `docker-compose.yml` sets the Docker provider endpoint and the shared
+  network (`proxy` by default, `TRAEFIK_NETWORK_NAME`) with CLI flags. It
+  also sets the redirect target to the externally published HTTPS port.
 - `providers.file` watches `dynamic/` for hot-reload of TLS config.
 - `entrypoints.web` redirects HTTP to HTTPS temporarily in HTTPS mode.
 - `api.insecure=false` - the dashboard is exposed only through a labeled
@@ -594,7 +612,7 @@ http:
   port conflicts with a local database, disable that binding again or assign a
   different `TRAEFIK_*_PORT` value in `.env`.
 - Certificate trust is determined by the Windows trust store, not the WSL2
-  trust store. Use `mise run trust-ca` to import `certs/ca.crt` into Windows
-  `CurrentUser\Root` (no admin required). To remove it: `mise run untrust-ca`.
+  trust store. Use `mise run certificates:trust-ca` to import `certs/ca.crt` into Windows
+  `CurrentUser\Root` (no admin required). To remove it: `mise run certificates:untrust-ca`.
   If Windows cannot reach WSL2-published ports, that is a WSL2 networking or
   Docker Engine port-publishing issue, not a certificate issue.

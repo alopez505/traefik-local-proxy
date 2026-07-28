@@ -33,7 +33,7 @@ been removed from every trust store where it was installed. For the Windows
 `CurrentUser\Root` store, use the guarded workflow:
 
 ```bash
-mise run replace-ca
+mise run certificates:replace-ca
 ```
 
 The task untrusts the CA represented by the existing `ca.crt`, replaces the
