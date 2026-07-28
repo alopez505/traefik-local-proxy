@@ -6,7 +6,7 @@
 #  browsers reach Traefik running in WSL2 without /etc/hosts changes.
 #
 #  First-time setup:
-#    cp .env.example .env              # optional: override ports and log level
+#    cp .env.example .env              # optional: override ports, bind addresses, log level
 #    mise run certs                    # generate local CA + wildcard cert
 #    mise run trust-ca                 # import CA into Windows CurrentUser trust store
 #    mise run up                       # start Traefik
@@ -50,7 +50,7 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.allowemptyservices=true"
       - '--providers.docker.defaultrule=Host(`{{ index .Labels "traefik.hostname" }}.localtest.me`)'
-      - "--providers.docker.network=proxy"
+      - "--providers.docker.network=${TRAEFIK_NETWORK_NAME:-proxy}"
       - "--providers.file.directory=/etc/traefik/dynamic"
       - "--providers.file.watch=true"
       - "--entrypoints.web.address=:80"
@@ -68,15 +68,17 @@ services:
     depends_on:
       - socket-proxy
     labels:
-      traefik.enable: "true"
+      # Set TRAEFIK_DASHBOARD_ENABLED=false to fully disable this router - it
+      # is the only path to both the dashboard UI and the API (api@internal).
+      traefik.enable: "${TRAEFIK_DASHBOARD_ENABLED:-true}"
       traefik.http.routers.proxy.rule: "Host(`proxy.localtest.me`)"
       traefik.http.routers.proxy.entrypoints: "websecure"
       traefik.http.routers.proxy.tls: "true"
       traefik.http.routers.proxy.service: "api@internal"
     ports:
-      # All ports bound to loopback - never exposed on the LAN.
-      - "127.0.0.1:${TRAEFIK_HTTP_PORT:-80}:80"
-      - "127.0.0.1:${TRAEFIK_HTTPS_PORT:-443}:443"
+      # Bound to 127.0.0.1 by default - see TRAEFIK_WEB_BIND_ADDRESS.
+      - "${TRAEFIK_WEB_BIND_ADDRESS:-127.0.0.1}:${TRAEFIK_HTTP_PORT:-80}:80"
+      - "${TRAEFIK_WEB_BIND_ADDRESS:-127.0.0.1}:${TRAEFIK_HTTPS_PORT:-443}:443"
       # Optional TCP entrypoints - uncomment only if you route database
       # containers through this proxy. These ports conflict with local database
       # installs (Neo4j, SQL Server, MySQL, Postgres); leave them commented
@@ -132,8 +134,10 @@ networks:
   #     proxy:
   #       external: true
   #       name: proxy
+  # Advanced: overriding TRAEFIK_NETWORK_NAME requires every already-configured
+  # consuming project's own network name to change too, or discovery breaks.
   proxy:
-    name: proxy
+    name: ${TRAEFIK_NETWORK_NAME:-proxy}
 
   # Internal-only network between Traefik and socket-proxy.
   socket-proxy-net:
