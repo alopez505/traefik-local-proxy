@@ -29,6 +29,10 @@ EXPLICIT_CONTAINER="traefik-fallback-explicit-demo"
 export TRAEFIK_HTTP_PORT="$HTTP_PORT"
 export TRAEFIK_HTTPS_PORT="$HTTPS_PORT"
 export TRAEFIK_LOG_LEVEL="INFO"
+# Pin this explicitly so an inherited shell value can never silently diverge
+# from the "proxy" network name hardcoded in refuse_if_network_exists and the
+# fixtures below.
+export TRAEFIK_NETWORK_NAME="proxy"
 
 proxy() {
   docker compose --project-name "$PROXY_PROJECT" \
@@ -49,7 +53,7 @@ services:
     image: traefik/whoami:v1.11.0
     container_name: $SVC_CONTAINER
     networks:
-      - proxy
+      - ${TRAEFIK_NETWORK_NAME}
     labels:
       traefik.enable: "true"
 
@@ -57,7 +61,7 @@ services:
     image: traefik/whoami:v1.11.0
     container_name: $UNDERSCORE_CONTAINER
     networks:
-      - proxy
+      - ${TRAEFIK_NETWORK_NAME}
     labels:
       traefik.enable: "true"
 
@@ -65,20 +69,22 @@ services:
     image: traefik/whoami:v1.11.0
     container_name: $EXPLICIT_CONTAINER
     networks:
-      - proxy
+      - ${TRAEFIK_NETWORK_NAME}
     labels:
       traefik.enable: "true"
       traefik.hostname: "fallback-explicit-wins"
 
 networks:
-  proxy:
+  ${TRAEFIK_NETWORK_NAME}:
     external: true
-    name: proxy
+    name: ${TRAEFIK_NETWORK_NAME}
 EOF
 }
 
 fixture() {
-  fixture_compose_yaml | docker compose --project-name "$FIXTURE_PROJECT" -f - "$@"
+  fixture_compose_yaml | docker compose --project-name "$FIXTURE_PROJECT" \
+    --env-file "$ROOT_DIR/.env.example" \
+    -f - "$@"
 }
 
 cleanup() {
@@ -92,7 +98,7 @@ cleanup() {
 trap cleanup EXIT
 
 refuse_if_containers_exist proxy traefik-socket-proxy "$SVC_CONTAINER" "$UNDERSCORE_CONTAINER" "$EXPLICIT_CONTAINER"
-refuse_if_network_exists proxy
+refuse_if_network_exists "$TRAEFIK_NETWORK_NAME"
 
 if [[ -f "$CRT" && -f "$KEY" ]]; then
   :

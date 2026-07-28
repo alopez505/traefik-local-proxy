@@ -24,6 +24,10 @@ HEADERS_FILE="$(mktemp)"
 export TRAEFIK_HTTP_PORT="$HTTP_PORT"
 export TRAEFIK_HTTPS_PORT="$HTTPS_PORT"
 export TRAEFIK_LOG_LEVEL="INFO"
+# Pin this explicitly so an inherited shell value can never silently diverge
+# from the "proxy" network name hardcoded in refuse_if_network_exists and the
+# baseline fixture below.
+export TRAEFIK_NETWORK_NAME="proxy"
 
 proxy_https() {
   docker compose --project-name "$PROXY_PROJECT" \
@@ -61,19 +65,21 @@ services:
     image: traefik/whoami:v1.11.0
     container_name: $BASELINE_CONTAINER
     networks:
-      - proxy
+      - ${TRAEFIK_NETWORK_NAME}
     labels:
       traefik.enable: "true"
 
 networks:
-  proxy:
+  ${TRAEFIK_NETWORK_NAME}:
     external: true
-    name: proxy
+    name: ${TRAEFIK_NETWORK_NAME}
 EOF
 }
 
 baseline_https() {
-  baseline_compose_yaml | docker compose --project-name "$BASELINE_PROJECT" -f - "$@"
+  baseline_compose_yaml | docker compose --project-name "$BASELINE_PROJECT" \
+    --env-file "$ROOT_DIR/.env.example" \
+    -f - "$@"
 }
 
 cleanup() {
@@ -89,7 +95,7 @@ cleanup() {
 trap cleanup EXIT
 
 refuse_if_containers_exist proxy traefik-socket-proxy traefik-whoami-demo "$BASELINE_CONTAINER"
-refuse_if_network_exists proxy
+refuse_if_network_exists "$TRAEFIK_NETWORK_NAME"
 
 if [[ -f "$CRT" && -f "$KEY" ]]; then
   :
