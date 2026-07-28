@@ -65,6 +65,12 @@ jobs:
       - name: defaultrule parity (HTTPS vs HTTP-only base)
         run: ./scripts/lib/compose-config-diff.sh '.services.proxy.command[] | select(startswith("--providers.docker.defaultrule="))' -- --env-file .env.example -f docker-compose.yml -- --env-file .env.example -f docker-compose.http.yml
 
+      - name: Compose config (disable HTTP-to-HTTPS redirect override)
+        run: docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.disable-http-to-https-redirect.yml config -q
+
+      - name: Redirect override parity
+        run: ./scripts/test-redirect-override-parity.sh
+
   runtime-smoke:
     runs-on: ubuntu-latest
     needs: validate

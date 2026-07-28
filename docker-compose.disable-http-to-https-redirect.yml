@@ -1,0 +1,41 @@
+# Advanced, opt-in: disables the automatic HTTP-to-HTTPS redirect on the
+# `web` entrypoint. Traefik has no boolean flag for this - the mere presence
+# of the `entrypoints.web.http.redirections.*` flags is what enables it, so
+# there is no env var for this (a TRAEFIK_HTTP_TO_HTTPS_REDIRECT_ENABLED
+# variable would be misleading: raw `docker compose` cannot conditionally
+# include this file based on an env var's value). Compose's `command:` key
+# fully replaces across -f files rather than merging, so this file restates
+# the entire command list from docker-compose.yml, minus exactly the 3
+# redirect lines. A CI check renders both configurations and asserts the
+# only difference is those 3 entries, to catch this file silently drifting
+# out of sync with a future edit to docker-compose.yml's command list.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.disable-http-to-https-redirect.yml up -d
+# or:
+#   mise run up-without-http-to-https-redirect
+
+services:
+  proxy:
+    command:
+      - "--global.sendanonymoususage=false"
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+      - "--ping=true"
+      - "--log.level=${TRAEFIK_LOG_LEVEL:-INFO}"
+      - "--accesslog=true"
+      - "--providers.docker=true"
+      - "--providers.docker.endpoint=tcp://socket-proxy:2375"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.allowemptyservices=true"
+      - '--providers.docker.defaultrule={{ if index .Labels "traefik.hostname" }}Host(`{{ index .Labels "traefik.hostname" }}.localtest.me`){{ else if and (eq "${TRAEFIK_FALLBACK_TO_COMPOSE_SERVICE_NAME:-false}" "true") (index .Labels "com.docker.compose.service") }}Host(`{{ normalize (index .Labels "com.docker.compose.service") }}.localtest.me`){{ else if and (eq "${TRAEFIK_FALLBACK_TO_CONTAINER_NAME:-false}" "true") (trimPrefix "/" .ContainerName) }}Host(`{{ normalize (trimPrefix "/" .ContainerName) }}.localtest.me`){{ else }}{{ end }}'
+      - "--providers.docker.network=${TRAEFIK_NETWORK_NAME:-proxy}"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.http.tls=true"
+      - "--entrypoints.neo4j.address=:7687"
+      - "--entrypoints.mssql.address=:1433"
+      - "--entrypoints.mysql.address=:3306"
+      - "--entrypoints.postgres.address=:5432"
