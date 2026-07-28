@@ -88,7 +88,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-refuse_if_containers_exist traefik-local traefik-socket-proxy traefik-whoami-demo "$BASELINE_CONTAINER"
+refuse_if_containers_exist proxy traefik-socket-proxy traefik-whoami-demo "$BASELINE_CONTAINER"
 refuse_if_network_exists proxy
 
 if [[ -f "$CRT" && -f "$KEY" ]]; then
@@ -107,12 +107,12 @@ else
 fi
 
 assert_https_mode() {
-  wait_for_health traefik-local
-  wait_for_url traefik-local "https://demo.localtest.me:$HTTPS_PORT/" \
+  wait_for_health proxy
+  wait_for_url proxy "https://demo.localtest.me:$HTTPS_PORT/" \
     --insecure --resolve "demo.localtest.me:$HTTPS_PORT:127.0.0.1"
   assert_status 200 "https://demo.localtest.me:$HTTPS_PORT/" \
     --insecure --resolve "demo.localtest.me:$HTTPS_PORT:127.0.0.1"
-  wait_for_url traefik-local "https://proxy.localtest.me:$HTTPS_PORT/api/version" \
+  wait_for_url proxy "https://proxy.localtest.me:$HTTPS_PORT/api/version" \
     --insecure --resolve "proxy.localtest.me:$HTTPS_PORT:127.0.0.1"
   assert_status 200 "https://proxy.localtest.me:$HTTPS_PORT/api/version" \
     --insecure --resolve "proxy.localtest.me:$HTTPS_PORT:127.0.0.1"
@@ -154,19 +154,19 @@ assert_https_mode
 
 echo "Confirming a container without traefik.hostname gets no route (baseline)..."
 baseline_https up -d
-wait_for_health traefik-local
+wait_for_health proxy
 assert_no_route_without_hostname_label
 baseline_https down --remove-orphans
 
 echo "Switching the same Compose projects to HTTP-only mode..."
 proxy_http up -d
 demo_http up -d
-wait_for_health traefik-local
-wait_for_url traefik-local "http://demo.localtest.me:$HTTP_PORT/" \
+wait_for_health proxy
+wait_for_url proxy "http://demo.localtest.me:$HTTP_PORT/" \
   --resolve "demo.localtest.me:$HTTP_PORT:127.0.0.1"
 assert_status 200 "http://demo.localtest.me:$HTTP_PORT/" \
   --resolve "demo.localtest.me:$HTTP_PORT:127.0.0.1"
-wait_for_url traefik-local "http://proxy.localtest.me:$HTTP_PORT/api/version" \
+wait_for_url proxy "http://proxy.localtest.me:$HTTP_PORT/api/version" \
   --resolve "proxy.localtest.me:$HTTP_PORT:127.0.0.1"
 assert_status 200 "http://proxy.localtest.me:$HTTP_PORT/api/version" \
   --resolve "proxy.localtest.me:$HTTP_PORT:127.0.0.1"
