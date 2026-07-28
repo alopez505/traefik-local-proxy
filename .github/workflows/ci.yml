@@ -110,13 +110,15 @@ jobs:
       - name: Install PSScriptAnalyzer
         shell: pwsh
         run: |
-          [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
-              Register-PSRepository -Default
+          $ErrorActionPreference = 'Stop'
+          if (Get-Command Install-PSResource -ErrorAction SilentlyContinue) {
+              # PSResourceGet ships with PowerShell 7 on windows-latest and needs
+              # no NuGet package-provider bootstrap (which fails on the runner).
+              Install-PSResource PSScriptAnalyzer -Version '[1.25.0]' -Repository PSGallery -TrustRepository -Reinstall -Scope CurrentUser
+          } else {
+              [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+              Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser -Force
           }
-          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-          Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force | Out-Null
-          Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser -Force
 
       - name: Analyze PowerShell scripts
         shell: pwsh
