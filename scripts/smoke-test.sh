@@ -6,8 +6,14 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/smoke-helpers.sh
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/lib/smoke-helpers.sh"
+
 PROXY_PROJECT="traefik-local-proxy-smoke"
 DEMO_PROJECT="traefik-whoami-smoke"
+BASELINE_PROJECT="traefik-baseline-smoke"
+BASELINE_CONTAINER="traefik-baseline-demo"
 HTTP_PORT="${SMOKE_HTTP_PORT:-18080}"
 HTTPS_PORT="${SMOKE_HTTPS_PORT:-18443}"
 CRT="$ROOT_DIR/certs/localtest.me.crt"
@@ -43,8 +49,36 @@ demo_http() {
     -f "$ROOT_DIR/examples/whoami/docker-compose.http.yml" "$@"
 }
 
+# Fixture with no traefik.hostname label at all - characterizes today's actual
+# behavior (no route generated) so a later hostname-fallback rework can prove
+# it didn't change this case unless a fallback flag is deliberately enabled.
+# Compose service name and container name are deliberately different strings
+# so a future fallback test can tell which tier (if any) produced a route.
+baseline_compose_yaml() {
+  cat <<EOF
+services:
+  baselinesvc:
+    image: traefik/whoami:v1.11.0
+    container_name: $BASELINE_CONTAINER
+    networks:
+      - proxy
+    labels:
+      traefik.enable: "true"
+
+networks:
+  proxy:
+    external: true
+    name: proxy
+EOF
+}
+
+baseline_https() {
+  baseline_compose_yaml | docker compose --project-name "$BASELINE_PROJECT" -f - "$@"
+}
+
 cleanup() {
   set +e
+  compose_down_quiet "$BASELINE_PROJECT"
   demo_https down --remove-orphans >/dev/null 2>&1
   proxy_https down --remove-orphans >/dev/null 2>&1
   if [[ "$GENERATED_CERTS" -eq 1 ]]; then
@@ -54,19 +88,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-for container in traefik-local traefik-socket-proxy traefik-whoami-demo; do
-  if docker container inspect "$container" >/dev/null 2>&1; then
-    echo "Refusing to run: container '$container' already exists." >&2
-    echo "Stop the active proxy/demo stack before running this smoke test." >&2
-    exit 1
-  fi
-done
-
-if docker network inspect proxy >/dev/null 2>&1; then
-  echo "Refusing to run: the 'proxy' network already exists." >&2
-  echo "Stop the active proxy/demo stack with 'mise run down' before running this smoke test." >&2
-  exit 1
-fi
+refuse_if_containers_exist traefik-local traefik-socket-proxy traefik-whoami-demo "$BASELINE_CONTAINER"
+refuse_if_network_exists proxy
 
 if [[ -f "$CRT" && -f "$KEY" ]]; then
   :
@@ -83,63 +106,13 @@ else
   GENERATED_CERTS=1
 fi
 
-wait_for_health() {
-  local health
-
-  for _ in {1..30}; do
-    health="$(docker inspect --format '{{.State.Health.Status}}' traefik-local 2>/dev/null || true)"
-    if [[ "$health" == "healthy" ]]; then
-      return 0
-    fi
-    sleep 2
-  done
-
-  echo "Traefik did not become healthy." >&2
-  docker logs traefik-local >&2 || true
-  return 1
-}
-
-wait_for_url() {
-  local url="$1"
-  shift
-
-  for _ in {1..30}; do
-    if curl --fail --silent --show-error --max-time 2 --noproxy '*' \
-      "$@" "$url" >/dev/null 2>&1; then
-      return 0
-    fi
-    sleep 2
-  done
-
-  echo "Timed out waiting for $url" >&2
-  docker logs traefik-local >&2 || true
-  docker inspect traefik-whoami-demo \
-    --format 'whoami networks={{json .NetworkSettings.Networks}} labels={{json .Config.Labels}}' \
-    >&2 || true
-  return 1
-}
-
-assert_status() {
-  local expected="$1"
-  local url="$2"
-  shift 2
-  local actual
-
-  actual="$(curl --silent --show-error --max-time 5 --output /dev/null \
-    --write-out '%{http_code}' --noproxy '*' "$@" "$url")"
-  if [[ "$actual" != "$expected" ]]; then
-    echo "Expected HTTP $expected from $url, received $actual." >&2
-    return 1
-  fi
-}
-
 assert_https_mode() {
-  wait_for_health
-  wait_for_url "https://demo.localtest.me:$HTTPS_PORT/" \
+  wait_for_health traefik-local
+  wait_for_url traefik-local "https://demo.localtest.me:$HTTPS_PORT/" \
     --insecure --resolve "demo.localtest.me:$HTTPS_PORT:127.0.0.1"
   assert_status 200 "https://demo.localtest.me:$HTTPS_PORT/" \
     --insecure --resolve "demo.localtest.me:$HTTPS_PORT:127.0.0.1"
-  wait_for_url "https://proxy.localtest.me:$HTTPS_PORT/api/version" \
+  wait_for_url traefik-local "https://proxy.localtest.me:$HTTPS_PORT/api/version" \
     --insecure --resolve "proxy.localtest.me:$HTTPS_PORT:127.0.0.1"
   assert_status 200 "https://proxy.localtest.me:$HTTPS_PORT/api/version" \
     --insecure --resolve "proxy.localtest.me:$HTTPS_PORT:127.0.0.1"
@@ -163,20 +136,37 @@ assert_https_mode() {
   fi
 }
 
+# Baseline characterization: a container with no traefik.hostname label gets
+# no usable route today. Neither its Compose service name nor its container
+# name should resolve to anything - both must 404, the same as any other
+# unmatched host on this entrypoint.
+assert_no_route_without_hostname_label() {
+  assert_status 404 "https://baselinesvc.localtest.me:$HTTPS_PORT/" \
+    --insecure --resolve "baselinesvc.localtest.me:$HTTPS_PORT:127.0.0.1"
+  assert_status 404 "https://${BASELINE_CONTAINER}.localtest.me:$HTTPS_PORT/" \
+    --insecure --resolve "${BASELINE_CONTAINER}.localtest.me:$HTTPS_PORT:127.0.0.1"
+}
+
 echo "Starting HTTPS mode on 127.0.0.1:$HTTP_PORT and 127.0.0.1:$HTTPS_PORT..."
 proxy_https up -d
 demo_https up -d
 assert_https_mode
 
+echo "Confirming a container without traefik.hostname gets no route (baseline)..."
+baseline_https up -d
+wait_for_health traefik-local
+assert_no_route_without_hostname_label
+baseline_https down --remove-orphans
+
 echo "Switching the same Compose projects to HTTP-only mode..."
 proxy_http up -d
 demo_http up -d
-wait_for_health
-wait_for_url "http://demo.localtest.me:$HTTP_PORT/" \
+wait_for_health traefik-local
+wait_for_url traefik-local "http://demo.localtest.me:$HTTP_PORT/" \
   --resolve "demo.localtest.me:$HTTP_PORT:127.0.0.1"
 assert_status 200 "http://demo.localtest.me:$HTTP_PORT/" \
   --resolve "demo.localtest.me:$HTTP_PORT:127.0.0.1"
-wait_for_url "http://proxy.localtest.me:$HTTP_PORT/api/version" \
+wait_for_url traefik-local "http://proxy.localtest.me:$HTTP_PORT/api/version" \
   --resolve "proxy.localtest.me:$HTTP_PORT:127.0.0.1"
 assert_status 200 "http://proxy.localtest.me:$HTTP_PORT/api/version" \
   --resolve "proxy.localtest.me:$HTTP_PORT:127.0.0.1"

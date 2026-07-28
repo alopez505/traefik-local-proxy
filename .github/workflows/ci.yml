@@ -21,7 +21,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck
 
       - name: ShellCheck
-        run: shellcheck scripts/*.sh
+        run: shellcheck scripts/*.sh scripts/lib/*.sh
 
       - name: Certificate lifecycle regression tests
         run: ./scripts/test-generate-dev-certs.sh
