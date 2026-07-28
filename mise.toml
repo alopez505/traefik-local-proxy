@@ -8,6 +8,8 @@
 uv = "0.10.10"
 # mkcert generates the local dev CA and wildcard cert (see tasks."certificates:generate").
 mkcert = "1.4.4"
+# jq is used by the Compose parity checks that `mise run validate` runs.
+jq = "1.7.1"
 
 [tasks.up]
 description = "Start Traefik (creates proxy network if needed)"
@@ -15,7 +17,7 @@ run = "./scripts/check-exposure.sh; docker compose up -d"
 
 [tasks.up-http]
 description = "Start Traefik without local TLS certificates"
-run = "docker compose -f docker-compose.http.yml up -d"
+run = "./scripts/check-exposure.sh; docker compose -f docker-compose.http.yml up -d"
 
 [tasks.up-without-http-to-https-redirect]
 description = "Start Traefik with the HTTP-to-HTTPS redirect disabled (advanced, opt-in)"
@@ -43,11 +45,11 @@ run = "docker compose ps"
 
 [tasks.update]
 description = "Pull images and apply the HTTPS proxy configuration"
-run = "docker compose pull && docker compose up -d"
+run = "./scripts/check-exposure.sh; docker compose pull && docker compose up -d"
 
 [tasks.update-http]
 description = "Pull images and apply the HTTP-only proxy configuration"
-run = "docker compose -f docker-compose.http.yml pull && docker compose -f docker-compose.http.yml up -d"
+run = "./scripts/check-exposure.sh; docker compose -f docker-compose.http.yml pull && docker compose -f docker-compose.http.yml up -d"
 
 [tasks."certificates:generate"]
 description = "Generate wildcard cert via mkcert (skips if already present)"
@@ -118,14 +120,11 @@ echo 'Validation OK'
 [tasks.network]
 description = "Show containers currently attached to the proxy network"
 run = """
-# Honor a TRAEFIK_NETWORK_NAME override the same way docker compose resolves
-# it: start from the .env value if present, then let a shell env var win.
-net="proxy"
-if [ -f .env ]; then
-	env_net="$(grep -E '^TRAEFIK_NETWORK_NAME=' .env | tail -1 | cut -d= -f2-)"
-	[ -n "$env_net" ] && net="$env_net"
-fi
-net="${TRAEFIK_NETWORK_NAME:-$net}"
+# Resolve TRAEFIK_NETWORK_NAME the same way the running proxy does, so an
+# override (quoted, interpolated, or shell-overridden) is honored rather than
+# hand-parsed from .env. Mirrors scripts/check-exposure.sh.
+net="$(docker compose config --environment 2>/dev/null | grep -E '^TRAEFIK_NETWORK_NAME=' | tail -1 | cut -d= -f2-)"
+net="${net:-proxy}"
 docker network inspect "$net" --format '{% raw %}{{range .Containers}}{{println .Name}}{{end}}{% endraw %}' 2>/dev/null || echo "$net network not yet created (run: mise run up)"
 """
 

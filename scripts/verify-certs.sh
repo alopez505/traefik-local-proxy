@@ -83,23 +83,20 @@ fi
 FAILED=0
 
 # --- Expiry ------------------------------------------------------------------
+# Use openssl -checkend for the actual decisions: it is portable, whereas
+# `date -d` is GNU-only and would silently skip the expiry check on BSD/macOS.
+# The human-readable end date is still read, for display only.
 end_date_raw="$(openssl x509 -in "$CERT" -noout -enddate 2>/dev/null | sed 's/^notAfter=//' || true)"
-if [[ -z "$end_date_raw" ]]; then
+if ! openssl x509 -in "$CERT" -noout -enddate >/dev/null 2>&1; then
   echo "FAIL expiry: could not read the certificate's expiry date."
   FAILED=1
+elif ! openssl x509 -in "$CERT" -noout -checkend 0 >/dev/null 2>&1; then
+  echo "FAIL expiry: certificate has expired${end_date_raw:+ (was valid until $end_date_raw)}."
+  FAILED=1
+elif ! openssl x509 -in "$CERT" -noout -checkend "$((30 * 24 * 3600))" >/dev/null 2>&1; then
+  echo "WARN expiry: certificate expires soon${end_date_raw:+ ($end_date_raw)}."
 else
-  end_epoch="$(date -d "$end_date_raw" +%s 2>/dev/null || true)"
-  now_epoch="$(date +%s)"
-  if [[ -z "$end_epoch" ]]; then
-    echo "WARN expiry: could not parse expiry date '$end_date_raw' to check against today."
-  elif [[ "$end_epoch" -lt "$now_epoch" ]]; then
-    echo "FAIL expiry: certificate expired on $end_date_raw."
-    FAILED=1
-  elif [[ $((end_epoch - now_epoch)) -lt $((30 * 24 * 3600)) ]]; then
-    echo "WARN expiry: certificate expires soon ($end_date_raw)."
-  else
-    echo "PASS expiry: certificate is valid until $end_date_raw."
-  fi
+  echo "PASS expiry: certificate is valid${end_date_raw:+ until $end_date_raw}."
 fi
 
 # --- SAN coverage --------------------------------------------------------------

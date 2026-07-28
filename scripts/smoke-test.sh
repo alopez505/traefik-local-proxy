@@ -14,6 +14,7 @@ PROXY_PROJECT="traefik-local-proxy-smoke"
 DEMO_PROJECT="traefik-whoami-smoke"
 BASELINE_PROJECT="traefik-baseline-smoke"
 BASELINE_CONTAINER="traefik-baseline-demo"
+BASELINE_CANARY_CONTAINER="traefik-baseline-canary-demo"
 HTTP_PORT="${SMOKE_HTTP_PORT:-18080}"
 HTTPS_PORT="${SMOKE_HTTPS_PORT:-18443}"
 CRT="$ROOT_DIR/certs/localtest.me.crt"
@@ -69,6 +70,18 @@ services:
     labels:
       traefik.enable: "true"
 
+  # Positively-routed canary in the SAME fixture: once its route answers, the
+  # Docker provider has demonstrably processed this batch, so the baselinesvc
+  # 404 assertions can't pass merely because discovery hasn't caught up yet.
+  baselinecanary:
+    image: traefik/whoami:v1.11.0
+    container_name: $BASELINE_CANARY_CONTAINER
+    networks:
+      - ${TRAEFIK_NETWORK_NAME}
+    labels:
+      traefik.enable: "true"
+      traefik.hostname: "baseline-canary"
+
 networks:
   ${TRAEFIK_NETWORK_NAME}:
     external: true
@@ -94,7 +107,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-refuse_if_containers_exist proxy traefik-socket-proxy traefik-whoami-demo "$BASELINE_CONTAINER"
+refuse_if_containers_exist proxy traefik-socket-proxy traefik-whoami-demo "$BASELINE_CONTAINER" "$BASELINE_CANARY_CONTAINER"
 refuse_if_network_exists "$TRAEFIK_NETWORK_NAME"
 
 if [[ -f "$CRT" && -f "$KEY" ]]; then
@@ -161,6 +174,10 @@ assert_https_mode
 echo "Confirming a container without traefik.hostname gets no route (baseline)..."
 baseline_https up -d
 wait_for_health proxy
+# Await the canary's positive route first, proving the Docker provider has
+# processed this fixture, before asserting the label-less service gets none.
+wait_for_url proxy "https://baseline-canary.localtest.me:$HTTPS_PORT/" \
+  --insecure --resolve "baseline-canary.localtest.me:$HTTPS_PORT:127.0.0.1"
 assert_no_route_without_hostname_label
 baseline_https down --remove-orphans
 
