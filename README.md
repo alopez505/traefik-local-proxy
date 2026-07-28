@@ -10,19 +10,42 @@ Pairs with any local Docker project that benefits from clean HTTPS routing:
 web apps, APIs, dashboards, documentation sites, admin tools, and internal
 utilities.
 
+## Contents
+
+- [Quick start](#quick-start)
+- [Troubleshooting](#troubleshooting)
+- [How it works](#how-it-works)
+- [What is localtest.me](#what-is-localtestme)
+- [Certificate setup (WSL2 + Windows)](#certificate-setup-wsl2--windows)
+- [Adding a service](#adding-a-service)
+- [Connecting another Docker project](#connecting-another-docker-project)
+- [Project database networking](#project-database-networking)
+- [Available tasks](#available-tasks)
+- [Configuration](#configuration)
+- [TCP database routing (optional)](#tcp-database-routing-optional)
+- [Install and dynamic config](#install-and-dynamic-config)
+- [Backend TLS compatibility](#backend-tls-compatibility)
+- [Optional hardening](#optional-hardening)
+- [Security notes](#security-notes)
+- [WSL2 notes](#wsl2-notes)
+
 ---
 
 ## Quick start
 
 Prerequisites: Docker Engine with Compose v2 and `mise`. Windows PowerShell
-must be accessible from WSL2 when using the Windows trust-store task. Choose
-one startup mode.
-The HTTPS mode is the default and is closest to production; the HTTP mode does
-not generate certificates or modify the Windows trust store.
+must be accessible from WSL2 when using the Windows trust-store task.
 
 `mise install` installs the repo-pinned versions of `mkcert` and `uv` defined in
 `mise.toml`. The validation task runs a pinned version of `pre-commit` through
 `uvx`; `uv` is otherwise only needed for that task.
+
+Choose one startup mode:
+
+| Mode | Task | Dashboard URL | Generates certs? | Touches Windows trust store? |
+| --- | --- | --- | --- | --- |
+| HTTPS (default, closest to production) | `mise run up` | <https://proxy.localtest.me> | Yes (`certificates:generate`) | Yes (`certificates:trust-ca`) |
+| HTTP-only (no local CA required) | `mise run up-http` | <http://proxy.localtest.me> | No | No |
 
 ### HTTPS mode (default)
 
@@ -71,6 +94,28 @@ The proxy switches automatically, but routed application containers do not
 change their labels. Use `mise run demo-http` for the HTTP demo, or update an
 application's router from `websecure` plus `tls: "true"` to `web` without the
 TLS label. Switch those labels back when returning to HTTPS.
+
+---
+
+## Troubleshooting
+
+Quick hits for the most common issues. Each links to the section with full detail.
+
+- **Browser says the certificate isn't trusted.** Run `mise run certificates:trust-ca`
+  (see "Certificate setup").
+- **`network proxy declared as external, but could not be found`.** Start
+  `traefik-local-proxy` first - it creates the network (see "Adding a service").
+- **Port `80`/`443` (or a database port) is already in use.** Override
+  `TRAEFIK_HTTP_PORT`/`TRAEFIK_HTTPS_PORT`/`TRAEFIK_*_PORT` in `.env`, or skip
+  that database's override file (see "Configuration").
+- **A service returns a 404 or never gets a route.** Confirm the container is
+  on the `proxy` network, has `traefik.enable=true`, and has either a
+  `traefik.hostname` label or an enabled fallback (see "Adding a service").
+- **Windows can't reach a WSL2-published port.** That's a WSL2 networking or
+  Docker Engine port-publishing issue, not a certificate problem (see "WSL2
+  notes").
+- **Dashboard is unreachable.** Check `TRAEFIK_DASHBOARD_ENABLED` and confirm
+  you're using the right scheme for the current mode (see "Switching modes").
 
 ---
 
