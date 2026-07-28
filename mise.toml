@@ -100,6 +100,7 @@ docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.m
 docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.postgres.yml config -q &&
 docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.mysql.yml config -q &&
 docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.neo4j.yml config -q &&
+./scripts/lib/compose-config-diff.sh '.services.proxy.command[] | select(startswith("--providers.docker.defaultrule="))' -- --env-file .env.example -f docker-compose.yml -- --env-file .env.example -f docker-compose.http.yml &&
 ./scripts/test-generate-dev-certs.sh &&
 ./scripts/test-verify-certs.sh &&
 ./scripts/test-import-certs-from-image.sh &&
@@ -147,6 +148,10 @@ fi
 [tasks.smoke]
 description = "Run live HTTPS/HTTP mode-transition and custom-port smoke tests"
 run = "./scripts/smoke-test.sh"
+
+[tasks.smoke-fallback]
+description = "Run live hostname-fallback resolution-order smoke tests"
+run = "./scripts/smoke-test-fallback.sh"
 
 [tasks."certificates:trust-ca"]
 description = "Import dev CA into Windows CurrentUser trust store (WSL2 -> Windows, no admin required)"
