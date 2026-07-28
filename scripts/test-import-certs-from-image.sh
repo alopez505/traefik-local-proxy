@@ -45,11 +45,13 @@ case "\${1:-}" in
     src="\$2"
     dest="\$3"
     path="\${src#*:}"
-    if [[ ! -e "\$FAKE_IMAGE_FILES\$path" ]]; then
+    if [[ ! -e "\$FAKE_IMAGE_FILES\$path" && ! -L "\$FAKE_IMAGE_FILES\$path" ]]; then
       echo "docker cp: no such path in fake image: \$path" >&2
       exit 1
     fi
-    cp "\$FAKE_IMAGE_FILES\$path" "\$dest"
+    # -P preserves symlinks, matching real docker cp (which does not
+    # dereference source links unless -L is given).
+    cp -P "\$FAKE_IMAGE_FILES\$path" "\$dest"
     exit 0
     ;;
   run | start)
@@ -75,6 +77,11 @@ openssl genrsa -out "$FAKE_IMAGE_FILES/certs/other.key" 2048 >/dev/null 2>&1
 
 # Not a certificate at all, for the invalid-cert test.
 printf 'not a certificate\n' >"$FAKE_IMAGE_FILES/certs/invalid.crt"
+
+# An absolute symlink to a host file, for the symlink-rejection test. docker cp
+# would preserve this link, so the importer must reject it before any chmod or
+# read follows it to the host target.
+ln -s /etc/hostname "$FAKE_IMAGE_FILES/certs/symlink.crt"
 
 run_importer() {
   PATH="$MOCK_BIN:$PATH" "$ROOT_DIR/scripts/import-certs-from-image.sh" "$@"
@@ -244,6 +251,24 @@ if ! grep -q "must be different paths" "$TEST_ROOT/alias-dest.out"; then
 fi
 if [[ -e "$dest_alias/pair.pem" ]]; then
   echo "Expected nothing to be written when alias destinations collide." >&2
+  exit 1
+fi
+
+# 11. A symlinked source path in the image is rejected before any chmod/read
+# follows it to a host file; nothing is installed.
+dest_symlink="$TEST_ROOT/dest-symlink"
+mkdir -p "$dest_symlink"
+if run_importer fake-image:1 --cert-path /certs/symlink.crt --key-path /certs/valid.key --dest-dir "$dest_symlink" >"$TEST_ROOT/symlink.out" 2>&1; then
+  echo "Expected a symlinked source path to be rejected." >&2
+  exit 1
+fi
+if ! grep -q "symlink or not a regular file" "$TEST_ROOT/symlink.out"; then
+  echo "Expected a symlink-rejection message, got:" >&2
+  cat "$TEST_ROOT/symlink.out" >&2
+  exit 1
+fi
+if [[ -e "$dest_symlink/imported.crt" || -e "$dest_symlink/imported.key" ]]; then
+  echo "Expected nothing to be installed for a symlinked source path." >&2
   exit 1
 fi
 
