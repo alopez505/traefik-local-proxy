@@ -1,0 +1,21 @@
+{
+  // VS Code prompts for these the first time the workspace opens over the WSL
+  // remote, and installs them INSIDE the distro, which is where Docker,
+  // shellcheck, and PowerShell diagnostics actually have to run.
+  "recommendations": [
+    "ms-azuretools.vscode-containers",
+    "redhat.vscode-yaml",
+    "editorconfig.editorconfig",
+    "timonwong.shellcheck",
+    "davidanson.vscode-markdownlint",
+    "tamasfe.even-better-toml",
+    "nefrob.vscode-just-syntax",
+    "ms-vscode.powershell"
+  ],
+  "unwantedRecommendations": [
+    // Docker Desktop's extension assumes a Desktop context/socket. This
+    // platform runs Docker Engine inside WSL; vscode-containers is the one to
+    // use.
+    "ms-azuretools.vscode-docker"
+  ]
+}

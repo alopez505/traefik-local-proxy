@@ -1,0 +1,25 @@
+# Normalize line endings. This repo is authored on Windows hosts but the working
+# copy runs under WSL, so be explicit: text is stored as LF in Git, and files that
+# execute under WSL must stay LF even on a Windows checkout.
+* text=auto
+
+# Must stay LF even when checked out on Windows (run/sourced under WSL).
+*.sh            text eol=lf
+*.yaml          text eol=lf
+*.yml           text eol=lf
+*.toml          text eol=lf
+*.json          text eol=lf
+*.md            text eol=lf
+*.example       text eol=lf
+justfile        text eol=lf
+.editorconfig   text eol=lf
+.gitignore      text eol=lf
+.gitattributes  text eol=lf
+
+# Windows-native scripts prefer CRLF.
+*.ps1           text eol=crlf
+
+# Binary / local TLS material: never diff or EOL-normalize.
+*.crt           binary
+*.key           binary
+*.pem           binary

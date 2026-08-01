@@ -1,3 +1,13 @@
 {
-  "python.terminal.useEnvFile": true
+  // The PowerShell extension hosts its language server INSIDE the "PowerShell
+  // Extension Terminal". That process is not optional: IntelliSense,
+  // formatting, and PSScriptAnalyzer diagnostics for scripts/*.ps1 come from it.
+  // Closing the terminal kills the language server, which is why VS Code then
+  // nags to restart it.
+  //
+  // So leave it running and just stop it from taking over the panel every time
+  // a .ps1 tab is restored. Do NOT reach for startInBackground instead: it
+  // hides the terminal for good (it cannot be re-hidden once shown).
+  "powershell.integratedConsole.showOnStartup": false,
+  "powershell.integratedConsole.suppressStartupBanner": true
 }
