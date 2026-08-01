@@ -4,12 +4,18 @@
 #  List tasks:   mise tasks
 # =============================================================================
 
+min_version = "2024.0.0"
+
 [tools]
-uv = "0.10.10"
+just = "1.40.0"
+uv = "0.11.30"
 # mkcert generates the local dev CA and wildcard cert (see tasks."certificates:generate").
 mkcert = "1.4.4"
 # jq is used by the Compose parity checks that `mise run validate` runs.
 jq = "1.7.1"
+
+[env]
+_.file = ".env"
 
 [tasks.up]
 description = "Start Traefik (creates proxy network if needed)"
@@ -57,7 +63,6 @@ run = "./scripts/generate-dev-certs.sh"
 
 [tasks."certificates:verify"]
 description = "Verify the configured certificate/key: expiry, SAN, pairing, chain, permissions"
-env = { _.file = ".env" }
 run = """
 ./scripts/verify-certs.sh \
   --cert "${TRAEFIK_CERTIFICATE_FILE:-./certs/localtest.me.crt}" \
@@ -125,38 +130,20 @@ run = """
 # hand-parsed from .env. Mirrors scripts/check-exposure.sh.
 net="$(docker compose config --environment 2>/dev/null | grep -E '^TRAEFIK_NETWORK_NAME=' | tail -1 | cut -d= -f2-)"
 net="${net:-proxy}"
-docker network inspect "$net" --format '{% raw %}{{range .Containers}}{{println .Name}}{{end}}{% endraw %}' 2>/dev/null || echo "$net network not yet created (run: mise run up)"
+docker network inspect "$net" --format '{% raw %}{{range .Containers}}{{println .Name}}{{end}}{% endraw %}' 2>/dev/null || echo "$net network not yet created (run: just up)"
 """
 
 [tasks.demo]
 description = "Start whoami test service at https://demo.localtest.me"
-run = """
-if [ -f .env ]; then
-	docker compose --env-file .env -f examples/whoami/docker-compose.yml up -d
-else
-	docker compose -f examples/whoami/docker-compose.yml up -d
-fi
-"""
+run = "docker compose -f examples/whoami/docker-compose.yml up -d"
 
 [tasks.demo-http]
 description = "Start whoami test service at http://demo.localtest.me"
-run = """
-if [ -f .env ]; then
-	docker compose --env-file .env -f examples/whoami/docker-compose.http.yml up -d
-else
-	docker compose -f examples/whoami/docker-compose.http.yml up -d
-fi
-"""
+run = "docker compose -f examples/whoami/docker-compose.http.yml up -d"
 
 [tasks.demo-down]
 description = "Stop the whoami test service"
-run = """
-if [ -f .env ]; then
-	docker compose --env-file .env -f examples/whoami/docker-compose.yml down
-else
-	docker compose -f examples/whoami/docker-compose.yml down
-fi
-"""
+run = "docker compose -f examples/whoami/docker-compose.yml down"
 
 [tasks.smoke]
 description = "Run live HTTPS/HTTP mode-transition and custom-port smoke tests"
