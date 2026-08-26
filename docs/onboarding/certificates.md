@@ -3,9 +3,9 @@
 1. Generate the wildcard certificate (creates the mkcert CA on first run):
 
    ```bash
-   ./scripts/generate-dev-certs.sh
+   mise run certificates:generate
    # Regenerate only the leaf while keeping the same CA:
-   ./scripts/generate-dev-certs.sh --force
+   mise run certificates:generate -- --force
    ```
 
 2. Import `certs/ca.crt` into the Windows trust store - **no admin required**:
