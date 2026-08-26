@@ -43,7 +43,7 @@ networks:
 
 **Start traefik-local-proxy first** - it creates the `proxy` network. Other
 services reference it as external and will fail to start if the network does
-not exist. If you run `just down` while no other containers are attached,
+not exist. If you run `mise run down` while no other containers are attached,
 start Traefik again before starting those services.
 
 ## Connecting another Docker project
@@ -85,9 +85,9 @@ will be reachable at <https://myapp.localtest.me>.
 This proxy is intended to remain running as shared local infrastructure. Both
 proxy services use `restart: unless-stopped`, so Docker restarts them after a
 Docker Engine or machine restart unless you explicitly stopped them. Start the
-proxy once with `just up` (or `just up-http` for HTTP-only), use
-`just update` (or `just update-http`) to apply image or configuration
-updates, and avoid `just down` during normal use because it also tries to
+proxy once with `mise run up` (or `mise run up-http` for HTTP-only), use
+`mise run update` (or `mise run update-http`) to apply image or configuration
+updates, and avoid `mise run down` during normal use because it also tries to
 remove the shared network.
 
 For a project with an application and a database, attach the application to

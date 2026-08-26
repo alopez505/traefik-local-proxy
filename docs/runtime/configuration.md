@@ -34,7 +34,7 @@ The automatic HTTP-to-HTTPS redirect has no on/off env var - Traefik has no
 boolean flag for it, the mere presence of the redirect flags is what enables
 it, and Compose's `command:` key fully replaces (not merges) across `-f`
 files, so there is no way to toggle just those flags with a variable. To
-disable it, use `just up-without-http-to-https-redirect`, or add
+disable it, use `mise run up-without-http-to-https-redirect`, or add
 `docker-compose.disable-http-to-https-redirect.yml` to your `-f` list
 directly. A CI check keeps that file in sync with docker-compose.yml's
 command list.
@@ -57,7 +57,7 @@ out if that port is already in use on the host.
   host interfaces, not just one.
 - Disable or otherwise protect the dashboard (`TRAEFIK_DASHBOARD_ENABLED=false`)
   before widening `TRAEFIK_WEB_BIND_ADDRESS`.
-- `just up` and `just validate` print a non-blocking advisory warning
-  when either bind address resolves to something other than `127.0.0.1`. This
-  only runs on just/mise-managed tasks - it cannot protect a raw `docker
-  compose up` invocation.
+- `mise run up` and `mise run validate` print a non-blocking advisory
+  warning when either bind address resolves to something other than
+  `127.0.0.1`. This only runs on mise-managed tasks - it cannot protect a raw
+  `docker compose up` invocation.

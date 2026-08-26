@@ -7,7 +7,6 @@
 min_version = "2024.0.0"
 
 [tools]
-just = "1.40.0"
 uv = "0.11.30"
 # mkcert generates the local dev CA and wildcard cert (see tasks."certificates:generate").
 mkcert = "1.4.4"
@@ -130,7 +129,7 @@ run = """
 # hand-parsed from .env. Mirrors scripts/check-exposure.sh.
 net="$(docker compose config --environment 2>/dev/null | grep -E '^TRAEFIK_NETWORK_NAME=' | tail -1 | cut -d= -f2-)"
 net="${net:-proxy}"
-docker network inspect "$net" --format '{% raw %}{{range .Containers}}{{println .Name}}{{end}}{% endraw %}' 2>/dev/null || echo "$net network not yet created (run: just up)"
+docker network inspect "$net" --format '{% raw %}{{range .Containers}}{{println .Name}}{{end}}{% endraw %}' 2>/dev/null || echo "$net network not yet created (run: mise run up)"
 """
 
 [tasks.demo]

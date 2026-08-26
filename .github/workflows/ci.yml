@@ -17,59 +17,14 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install ShellCheck
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck
+      - name: Install mise and pinned tools
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
 
-      - name: ShellCheck
-        run: shellcheck scripts/*.sh scripts/lib/*.sh
-
-      - name: Certificate lifecycle regression tests
-        run: ./scripts/test-generate-dev-certs.sh
-
-      - name: Certificate verification regression tests
-        run: ./scripts/test-verify-certs.sh
-
-      - name: Certificate import regression tests
-        run: ./scripts/test-import-certs-from-image.sh
-
-      - name: Exposure checker regression tests
-        run: ./scripts/test-check-exposure.sh
-
-      - name: Compose config (base)
-        run: docker compose --env-file .env.example config -q
-
-      - name: Compose config (HTTP-only base)
-        run: docker compose --env-file .env.example -f docker-compose.http.yml config -q
-
-      - name: Compose config (HTTPS whoami example)
-        run: docker compose --env-file .env.example -f examples/whoami/docker-compose.yml config -q
-
-      - name: Compose config (HTTP-only whoami example)
-        run: docker compose --env-file .env.example -f examples/whoami/docker-compose.http.yml config -q
-
-      - name: Compose config (custom Traefik image override)
-        run: TRAEFIK_IMAGE=traefik:v3.7.9 docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.use-custom-traefik-image.yml config -q
-
-      - name: Compose config (MSSQL override)
-        run: docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.mssql.yml config -q
-
-      - name: Compose config (Postgres override)
-        run: docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.postgres.yml config -q
-
-      - name: Compose config (MySQL override)
-        run: docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.mysql.yml config -q
-
-      - name: Compose config (Neo4j override)
-        run: docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.neo4j.yml config -q
-
-      - name: defaultrule parity (HTTPS vs HTTP-only base)
-        run: ./scripts/lib/compose-config-diff.sh '.services.proxy.command[] | select(startswith("--providers.docker.defaultrule="))' -- --env-file .env.example -f docker-compose.yml -- --env-file .env.example -f docker-compose.http.yml
-
-      - name: Compose config (disable HTTP-to-HTTPS redirect override)
-        run: docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.disable-http-to-https-redirect.yml config -q
-
-      - name: Redirect override parity
-        run: ./scripts/test-redirect-override-parity.sh
+      # Same gate as local development: pre-commit hooks (shellcheck,
+      # gitleaks), every compose config, parity checks, regression tests.
+      # Task definition: mise.toml [tasks.validate].
+      - name: Validate
+        run: mise run validate
 
   runtime-smoke:
     runs-on: ubuntu-latest

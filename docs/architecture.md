@@ -30,7 +30,7 @@ flowchart LR
   Static["docker-compose.yml<br/>install configuration"] --> T["Traefik"]
   Dyn["dynamic/tls.yml<br/>hot-reloaded"] --> T
   Certs["certs/<br/>leaf certificate + key"] --> Dyn
-  CACopy["certs/ca.crt<br/>CA copy"] -->|"just certificates-trust-ca"| Trust["Windows trust store"]
+  CACopy["certs/ca.crt<br/>CA copy"] -->|"mise run certificates:trust-ca"| Trust["Windows trust store"]
   T -->|"filtered Docker API<br/>tcp://socket-proxy:2375"| S["socket-proxy"]
   S <-->|"read-only Docker API<br/>/var/run/docker.sock"| D["Docker Engine"]
   S -->|"container metadata<br/>labels, networks, events"| T
@@ -129,15 +129,15 @@ Key install settings in the Compose commands:
 
 ## WSL2 notes
 
-- Docker Engine runs on the WSL2 instance; `just up` runs there too.
+- Docker Engine runs on the WSL2 instance; `mise run up` runs there too.
 - `*.localtest.me` resolves publicly to `127.0.0.1`, so Windows browsers reach
   WSL2-published ports without `/etc/hosts` changes.
 - The optional database port bindings are disabled by default. If an enabled
   port conflicts with a local database, disable that binding again or assign a
   different `TRAEFIK_*_PORT` value in `.env`.
 - Certificate trust is determined by the Windows trust store, not the WSL2
-  trust store. Use `just certificates-trust-ca` to import `certs/ca.crt` into
-  Windows `CurrentUser\Root` (no admin required). To remove it: `just
-  certificates-untrust-ca`. If Windows cannot reach WSL2-published ports, that
+  trust store. Use `mise run certificates:trust-ca` to import `certs/ca.crt`
+  into Windows `CurrentUser\Root` (no admin required). To remove it:
+  `mise run certificates:untrust-ca`. If Windows cannot reach WSL2-published ports, that
   is a WSL2 networking or Docker Engine port-publishing issue, not a
   certificate issue.
