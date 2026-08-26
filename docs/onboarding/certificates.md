@@ -11,24 +11,24 @@
 2. Import `certs/ca.crt` into the Windows trust store - **no admin required**:
 
    ```bash
-   just certificates-trust-ca
+   mise run certificates:trust-ca
    ```
 
    This invokes `scripts/trust-ca-windows.ps1`, which imports into
-   `Cert:\CurrentUser\Root`. To remove it later: `just certificates-untrust-ca`.
+   `Cert:\CurrentUser\Root`. To remove it later: `mise run certificates:untrust-ca`.
 
-> **Important:** `just certificates-untrust-ca` removes only the root certificate that
+> **Important:** `mise run certificates:untrust-ca` removes only the root certificate that
 > matches `certs/ca.crt`. mkcert normally shares one CA across projects for a
 > user profile, so other projects using that same CA will stop trusting it.
 
 Because `--force` reuses the same mkcert CA, you do not need to re-run
-`just certificates-trust-ca` after regenerating the leaf. If mkcert's CAROOT changes or
+`mise run certificates:trust-ca` after regenerating the leaf. If mkcert's CAROOT changes or
 its CA is reset, the generator refuses to overwrite `certs/ca.crt` - even with
 `--force` - because that file is required to identify the exact old trusted root.
 Use the guarded rotation workflow instead:
 
 ```bash
-just certificates-replace-ca
+mise run certificates:replace-ca
 ```
 
 It removes the old CA from Windows `CurrentUser\Root`, verifies the removal,
@@ -49,10 +49,10 @@ import a certificate/key pair out of a container image instead - without ever
 starting that image - run:
 
 ```bash
-just certificates-import-from-image IMAGE --cert-path PATH --key-path PATH
+mise run certificates:import-from-image -- IMAGE --cert-path PATH --key-path PATH
 ```
 
-Run `just certificates-verify` after either path to check expiry, SAN
+Run `mise run certificates:verify` after either path to check expiry, SAN
 coverage, that the certificate and key actually match, chain structure, and
 key file permissions.
 
@@ -65,7 +65,7 @@ key file permissions.
 > employer names as subdomains on a work network. Use generic names like
 > `api.localtest.me`, `demo.localtest.me`, `app.localtest.me`.
 >
-> **Team setup (onboarding):** Every developer runs `just certificates-generate`, which uses
+> **Team setup (onboarding):** Every developer runs `mise run certificates:generate`, which uses
 > mkcert to create their **own** local CA (stored in their own mkcert CAROOT) and
 > sign their own leaf. Never share that CA around for the whole team to trust:
 > whoever holds a CA private key that other machines trust can mint trusted
@@ -73,7 +73,7 @@ key file permissions.
 > the CA key in CAROOT, outside the repo, and `certs/` is gitignored (with the
 > pre-commit / CI gitleaks hooks as a backstop), so the CA private key never
 > leaves the machine that created it. When you re-image or hand off a machine,
-> run `just certificates-untrust-ca` first.
+> run `mise run certificates:untrust-ca` first.
 
 ## The certs/ directory
 
