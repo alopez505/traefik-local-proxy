@@ -105,7 +105,7 @@ docker compose --env-file .env.example config -q &&
 docker compose --env-file .env.example -f docker-compose.http.yml config -q &&
 docker compose --env-file .env.example -f examples/whoami/docker-compose.yml config -q &&
 docker compose --env-file .env.example -f examples/whoami/docker-compose.http.yml config -q &&
-TRAEFIK_IMAGE=traefik:v3.7.9 docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.use-custom-traefik-image.yml config -q &&
+TRAEFIK_IMAGE=ghcr.io/example/custom-traefik:1.0.0 docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.use-custom-traefik-image.yml config -q &&
 docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.mssql.yml config -q &&
 docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.postgres.yml config -q &&
 docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.mysql.yml config -q &&

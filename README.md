@@ -85,7 +85,7 @@ TLS label. Switch those labels back when returning to HTTPS.
 | `mise run validate` | Full local gate: pre-commit hooks + all compose configs |
 | `mise run network` | List containers currently attached to the proxy network |
 
-Full reference (all 24 tasks): [docs/operations/tasks.md](docs/operations/tasks.md).
+Full reference: [docs/operations/tasks.md](docs/operations/tasks.md).
 
 ## Layout
 
