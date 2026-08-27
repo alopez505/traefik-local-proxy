@@ -25,6 +25,10 @@ jobs:
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
           minimum_release_age: 7d
+          # v4.3.0 has no default for this input (added upstream later);
+          # without it the age-filtered release lookup and mise's own
+          # GitHub-hosted tool downloads run unauthenticated (rate-limit flaky)
+          github_token: ${{ github.token }}
 
       # Same gate as local development: pre-commit hooks (shellcheck,
       # gitleaks), every compose config, parity checks, regression tests.
