@@ -17,16 +17,17 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # mise itself is not version-pinned: mise.toml floors it (min_version)
-      # and mise.lock pins what it installs, so the binary is a task
-      # dispatcher, not part of what validate asserts. minimum_release_age is
-      # upstream's documented alternative to a version pin: it gates the
-      # install path, so CI never lands on a same-day release. The action
-      # detects mise.lock and installs with --locked (checksum-verified).
+      # Pinned like everything else this job depends on (action by SHA,
+      # tools by mise.lock, hooks by rev in .pre-commit-config.yaml): mise
+      # installs the tools and dispatches the whole gate, so a floating
+      # version could change CI with no repo change. Bump deliberately;
+      # Dependabot tracks the action ref, not this input. Deliberately no
+      # sha256 input - supplying one makes the action skip its own
+      # minisign-signed SHASUMS256.txt check, which is the stronger verify.
       - name: Install mise and pinned tools
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
-          minimum_release_age: 7d
+          version: 2026.8.9
 
       # Same gate as local development: pre-commit hooks (shellcheck,
       # gitleaks), every compose config, parity checks, regression tests.
