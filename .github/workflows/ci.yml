@@ -17,8 +17,14 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # mise itself is not version-pinned: mise.toml floors it (min_version)
+      # and pins everything it installs, so the binary is a task dispatcher,
+      # not part of what validate asserts. minimum_release_age keeps CI off
+      # same-day releases so a bad one is caught upstream, not here.
       - name: Install mise and pinned tools
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          minimum_release_age: 7d
 
       # Same gate as local development: pre-commit hooks (shellcheck,
       # gitleaks), every compose config, parity checks, regression tests.
