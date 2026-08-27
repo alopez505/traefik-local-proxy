@@ -1,9 +1,9 @@
 # Task reference
 
-Tasks are defined in `mise.toml` and run with `mise run <task>` (see
-[../../CLAUDE.md](../../CLAUDE.md)). Run `mise tasks` for the short form of
-this table. Always use the `mise run` form: bare `mise up` and `mise config`
-are mise's own subcommands (upgrade, settings), not this repo's tasks.
+Tasks are defined in `mise.toml` and run with `mise run <task>`. Run
+`mise tasks` for the short form of this table. Always use the `mise run`
+form: bare `mise up` and `mise config` are mise's own subcommands (upgrade,
+settings), not this repo's tasks.
 
 Pass flags through to the underlying script after `--`, for example
 `mise run certificates:generate -- --force`.
