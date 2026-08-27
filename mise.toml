@@ -4,7 +4,9 @@
 #  List tasks:   mise tasks
 # =============================================================================
 
-min_version = "2024.0.0"
+# 2025.11.11 added `mise install --locked`, the strict lockfile mode CI runs;
+# `mise lock` (2025.7.x) is older, so this floor covers the whole mise.lock flow.
+min_version = "2025.11.11"
 
 [tools]
 uv = "0.11.30"
