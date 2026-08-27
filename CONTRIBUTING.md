@@ -24,7 +24,10 @@ running Docker daemon.
 
 ## Pinned versions
 
-Tool versions (`mkcert`, `jq`, `uv`) are pinned in `mise.toml`. `shellcheck`
-and `gitleaks` versions are pinned in `.pre-commit-config.yaml`. The Traefik
+Tool versions (`mkcert`, `jq`, `uv`) are pinned in `mise.toml`, with their
+download URLs and checksums locked in `mise.lock` for every platform. After
+changing a version in `mise.toml`, run `mise lock` and commit the updated
+lockfile; CI installs with `--locked` and fails if the two disagree.
+`shellcheck` and `gitleaks` versions are pinned in `.pre-commit-config.yaml`. The Traefik
 image version is a literal tag in the Compose manifests (not a variable), so
 Dependabot can track and bump it directly.
