@@ -4,10 +4,11 @@
 #  List tasks:   mise tasks
 # =============================================================================
 
-min_version = "2024.0.0"
+# 2025.11.11 added `mise install --locked`, the strict lockfile mode CI runs;
+# `mise lock` (2025.7.x) is older, so this floor covers the whole mise.lock flow.
+min_version = "2025.11.11"
 
 [tools]
-just = "1.40.0"
 uv = "0.11.30"
 # mkcert generates the local dev CA and wildcard cert (see tasks."certificates:generate").
 mkcert = "1.4.4"
@@ -106,7 +107,7 @@ docker compose --env-file .env.example config -q &&
 docker compose --env-file .env.example -f docker-compose.http.yml config -q &&
 docker compose --env-file .env.example -f examples/whoami/docker-compose.yml config -q &&
 docker compose --env-file .env.example -f examples/whoami/docker-compose.http.yml config -q &&
-TRAEFIK_IMAGE=traefik:v3.7.9 docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.use-custom-traefik-image.yml config -q &&
+TRAEFIK_IMAGE=ghcr.io/example/custom-traefik:1.0.0 docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.use-custom-traefik-image.yml config -q &&
 docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.mssql.yml config -q &&
 docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.postgres.yml config -q &&
 docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.mysql.yml config -q &&
@@ -130,7 +131,7 @@ run = """
 # hand-parsed from .env. Mirrors scripts/check-exposure.sh.
 net="$(docker compose config --environment 2>/dev/null | grep -E '^TRAEFIK_NETWORK_NAME=' | tail -1 | cut -d= -f2-)"
 net="${net:-proxy}"
-docker network inspect "$net" --format '{% raw %}{{range .Containers}}{{println .Name}}{{end}}{% endraw %}' 2>/dev/null || echo "$net network not yet created (run: just up)"
+docker network inspect "$net" --format '{% raw %}{{range .Containers}}{{println .Name}}{{end}}{% endraw %}' 2>/dev/null || echo "$net network not yet created (run: mise run up)"
 """
 
 [tasks.demo]

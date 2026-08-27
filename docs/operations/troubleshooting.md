@@ -2,7 +2,7 @@
 
 Quick hits for the most common issues. Each links to the section with full detail.
 
-- **Browser says the certificate isn't trusted.** Run `just certificates-trust-ca`
+- **Browser says the certificate isn't trusted.** Run `mise run certificates:trust-ca`
   (see [../onboarding/certificates.md](../onboarding/certificates.md)).
 - **`network proxy declared as external, but could not be found`.** Start
   `traefik-local-proxy` first - it creates the network (see

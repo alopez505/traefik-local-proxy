@@ -9,7 +9,6 @@
     "timonwong.shellcheck",
     "davidanson.vscode-markdownlint",
     "tamasfe.even-better-toml",
-    "nefrob.vscode-just-syntax",
     "ms-vscode.powershell"
   ],
   "unwantedRecommendations": [
