@@ -24,14 +24,15 @@ running Docker daemon.
 
 ## Pinned versions
 
-Tool versions (`mkcert`, `jq`, `uv`) are pinned in `mise.toml`, and `mise.lock`
-locks a download URL for each of the seven supported platforms. `jq` and `uv`
-also carry checksums there; `mkcert` is URL-only, because its upstream release
-publishes bare binaries with no checksum file for aqua to record. After
+Tool versions (`mkcert`, `jq`, `uv`, `gitleaks`) are pinned in `mise.toml`, and
+`mise.lock` locks a download URL for each of the seven supported platforms. `jq`,
+`uv` and `gitleaks` also carry checksums there; `mkcert` is URL-only, because its
+upstream release publishes bare binaries with no checksum file for aqua to record. After
 changing a version in `mise.toml`, run `mise lock` and commit the updated
 lockfile: CI installs with `--locked` and fails if the two disagree.
 
-`shellcheck` and `gitleaks` are pinned in `.pre-commit-config.yaml`, and mise
+`shellcheck` is pinned in `.pre-commit-config.yaml`; `gitleaks` is pinned in
+`mise.toml` and the hook runs that binary, so no Go toolchain is built. mise
 itself is pinned in `.github/workflows/ci.yml`. The Traefik image version is a
 literal tag in the Compose manifests (not a variable), so Dependabot can track
 and bump it directly.

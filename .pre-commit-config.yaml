@@ -4,7 +4,11 @@ repos:
     hooks:
       - id: shellcheck
 
-  - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.30.0
+  - repo: local
     hooks:
+      # The mise-pinned binary (mise.toml); the upstream hook builds gitleaks with Go.
       - id: gitleaks
+        name: gitleaks
+        entry: mise exec -- gitleaks git --pre-commit --redact --staged --verbose --no-banner
+        language: system
+        pass_filenames: false
