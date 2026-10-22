@@ -6,7 +6,7 @@
 #   traefik.http.services.<name>.loadbalancer.server.scheme: "https"
 #   traefik.http.services.<name>.loadbalancer.serverstransport: "skip-backend-certificate-verification@file"
 #
-# See README "Backend TLS compatibility" before using this - it weakens
+# See docs/runtime/backend-tls.md before using this - it weakens
 # certificate verification between Traefik and that one backend.
 http:
   serversTransports:

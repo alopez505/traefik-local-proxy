@@ -3,10 +3,11 @@
 # bind-address settings before starting the proxy - it never fails and never
 # blocks a start, it only prints a warning to stderr.
 #
-# This only runs on mise-managed paths (mise run up / validate / ...). It
-# cannot protect a raw `docker compose up` invocation that bypasses mise
-# entirely - see README "Configuration" for the same caveat spelled out for
-# people who don't use mise.
+# This only runs on mise-managed paths (mise run up, mise run validate, and
+# the other start and update tasks). It cannot protect a raw
+# `docker compose up` invocation that bypasses mise entirely - see
+# docs/runtime/configuration.md for the same caveat spelled out for people
+# who don't use mise.
 
 set -uo pipefail
 

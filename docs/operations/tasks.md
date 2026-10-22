@@ -14,7 +14,7 @@ mise run up-http                            # start Traefik without local TLS ce
 mise run up-without-http-to-https-redirect  # advanced: HTTPS mode, redirect disabled
 mise run stop                               # stop Traefik, keep proxy network
 mise run down                               # stop Traefik and remove proxy if no other containers use it
-mise run restart                            # restart Traefik process; use up to apply config changes
+mise run restart                            # restart Traefik process; use mise run up or mise run up-http to apply config changes
 mise run logs                               # follow Traefik logs
 mise run ps                                 # show service status
 mise run update                             # pull images + apply the HTTPS configuration
@@ -29,12 +29,16 @@ mise run demo                               # start whoami test service at https
 mise run demo-http                          # start whoami test service at http://demo.localtest.me
 mise run demo-down                          # stop the whoami test service
 mise run config                             # validate docker-compose.yml
-mise run validate                           # run pre-commit hooks + validate all compose configs
+mise run validate                           # pre-commit hooks, all compose configs, parity checks, regression tests
 mise run smoke                              # live HTTPS/HTTP transition and custom-port checks
 mise run smoke-fallback                     # live hostname-fallback resolution-order checks
 mise run network                            # list containers currently on proxy
 ```
 
-The smoke task uses loopback ports `18080`/`18443`, a disposable network, and
-cleans up afterward. It refuses to run while the normal proxy or demo
-containers exist.
+`mise run smoke` uses loopback ports `18080`/`18443` and a temporary `proxy`
+network, and cleans up afterward. It refuses to run while the normal proxy or
+demo containers, or an existing `proxy` network, exist.
+`mise run smoke-fallback` uses ports `18280`/`18543` and the same guard
+against an existing proxy stack. CI runs the same scripts in its
+`runtime-smoke` job; see
+[CONTRIBUTING.md](../../CONTRIBUTING.md#continuous-integration).

@@ -22,14 +22,14 @@ Choose one startup mode:
 
 | Mode | Command | Dashboard URL | Needs generated certs? | Needs Windows trust? |
 | --- | --- | --- | --- | --- |
-| HTTPS (default, closest to production) | `mise run up` | <https://proxy.localtest.me> | Yes (`certificates:generate`) | Yes (`certificates:trust-ca`) |
+| HTTPS (default, closest to production) | `mise run up` | <https://proxy.localtest.me> | Yes (`mise run certificates:generate`) | Yes (`mise run certificates:trust-ca`) |
 | HTTP-only (no local CA required) | `mise run up-http` | <http://proxy.localtest.me> | No | No |
 
 ### HTTPS mode (default)
 
 ```bash
 mise trust                            # one time per clone
-mise install                          # install pinned tools (mkcert, jq, uv)
+mise install                          # install pinned tools (mkcert, jq, uv, gitleaks)
 cp .env.example .env                  # optional: override ports or log level
 mise run certificates:generate        # generate the wildcard cert via mkcert (skips if present)
 mise run certificates:trust-ca        # import the CA into Windows CurrentUser\Root (WSL2 -> Windows)
@@ -82,7 +82,7 @@ TLS label. Switch those labels back when returning to HTTPS.
 | `mise run certificates:generate` | Generate the wildcard cert via mkcert |
 | `mise run certificates:trust-ca` | Import the dev CA into the Windows trust store |
 | `mise run demo` / `mise run demo-down` | Start/stop the whoami test service |
-| `mise run validate` | Full local gate: pre-commit hooks + all compose configs |
+| `mise run validate` | Full local gate: pre-commit hooks, all compose configs, parity checks, regression tests |
 | `mise run network` | List containers currently attached to the proxy network |
 
 Full reference: [docs/operations/tasks.md](docs/operations/tasks.md).
@@ -107,9 +107,10 @@ docs/              Architecture, onboarding, runtime, and operations
 - Operations: [tasks](docs/operations/tasks.md) ·
   [hardening](docs/operations/hardening.md) ·
   [troubleshooting](docs/operations/troubleshooting.md)
+- Contributing: [local checks and CI](CONTRIBUTING.md)
 
 ## Non-goals
 
-No production TLS termination, no multi-tenant/shared-hosting isolation, no
-Kubernetes, and no CI/CD pipelines. This proxy is local-development
-infrastructure, not a production reverse proxy.
+No production TLS termination, no multi-tenant/shared-hosting isolation, and
+no Kubernetes. This proxy is local-development infrastructure, not a
+production reverse proxy.

@@ -1,9 +1,14 @@
 # Optional hardening
 
+The middleware files on this page go in `dynamic/`. HTTPS mode loads that
+whole directory; HTTP-only mode (`mise run up-http`) loads only
+`dynamic/serverstransport.yml`, so routers used with it cannot reference
+`dashboard-auth@file` or `security-headers@file`.
+
 ## Dashboard basic auth
 
-Add a `dynamic/dashboard-auth.yml` file (gitignore it if it contains
-credentials):
+Add a `dynamic/dashboard-auth.yml` file (already gitignored, since it may
+contain credentials):
 
 ```yaml
 http:
@@ -21,8 +26,10 @@ Then reference the middleware on the dashboard router label in
 traefik.http.routers.proxy.middlewares: "dashboard-auth@file"
 ```
 
-Since ports are loopback-only, this is defense-in-depth, not a hard
-requirement.
+With the default loopback bind address this is defense-in-depth. Before
+widening `TRAEFIK_WEB_BIND_ADDRESS`, add this middleware (HTTPS mode only) or
+disable the dashboard (see
+[../runtime/configuration.md](../runtime/configuration.md)).
 
 ## Security response headers
 

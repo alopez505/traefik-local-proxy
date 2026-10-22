@@ -40,7 +40,8 @@ Traefik watches Docker through the local socket-proxy service for containers tha
 
 1. Are attached to the shared proxy network (default: `proxy`)
 2. Have `traefik.enable=true`
-3. Have routing labels or a `traefik.hostname` label
+3. Have routing labels, a `traefik.hostname` label, or an enabled hostname
+   fallback (see [runtime/connecting-services.md](runtime/connecting-services.md#adding-a-service))
 
 It automatically picks them up, no restart required.
 
@@ -76,7 +77,8 @@ Traefik supports file, CLI, and environment install configuration as separate
 methods, so this repository uses CLI consistently rather than mixing methods.
 That lets Compose interpolate the selected network, log level, and external
 HTTPS redirect port. HTTP-only mode has no `websecure` entrypoint, HTTPS port,
-file provider, or certificate mount.
+or certificate mount, and its file provider loads only
+`dynamic/serverstransport.yml`.
 
 Dynamic TLS configuration lives in [`dynamic/tls.yml`](../dynamic/tls.yml).
 
@@ -86,12 +88,15 @@ referenced by `TRAEFIK_CERTIFICATE_FILE`/`TRAEFIK_CERTIFICATE_KEY_FILE`
 container paths. Traefik does not receive `certs/ca.crt` or any unrelated
 file that may exist in `certs/`. The checked-in `tls.yml` expects those exact
 leaf filenames regardless of which host files back them. HTTP-only mode does
-not mount or load the dynamic directory or certificate files.
+not mount the certificate files or the `dynamic/` directory; it mounts and
+loads only `dynamic/serverstransport.yml`.
 
 Key install settings in the Compose commands:
 
-- `providers.docker.defaultRule` generates routes from `traefik.hostname`
-  labels without explicit `Host()` rules in every label set.
+- `providers.docker.defaultRule` builds each container's `Host()` rule from
+  its `traefik.hostname` label, or from its Compose service or container name
+  when a hostname fallback is enabled, so label sets do not need explicit
+  `Host()` rules.
 - `docker-compose.yml` sets the Docker provider endpoint and the shared
   network (`proxy` by default, `TRAEFIK_NETWORK_NAME`) with CLI flags. It
   also sets the redirect target to the externally published HTTPS port.
@@ -101,7 +106,7 @@ Key install settings in the Compose commands:
   only the single transport file, since it has no TLS config to hot-reload.
 - `entrypoints.web` redirects HTTP to HTTPS temporarily in HTTPS mode.
 - `api.insecure=false` - the dashboard is exposed only through a labeled
-  router: TLS in the default mode and loopback-only HTTP in HTTP mode.
+  router: TLS in the default mode and plain HTTP in HTTP-only mode.
 
 ## Security notes
 
@@ -110,8 +115,8 @@ Key install settings in the Compose commands:
   (see [runtime/configuration.md](runtime/configuration.md)). Disable or
   protect the dashboard first if you do.
 - The dashboard is served over HTTPS through the `proxy.localtest.me` route in
-  the default mode. The explicit HTTP fallback serves it over loopback HTTP.
-  `api.insecure` remains disabled in both modes.
+  the default mode. HTTP-only mode serves it over plain HTTP (loopback by
+  default). `api.insecure` remains disabled in both modes.
 - Docker socket access effectively grants full Docker API access on the host.
   The raw socket is mounted only into `socket-proxy`; Traefik talks to the
   filtered API endpoint at `tcp://socket-proxy:2375`. Keep this stack

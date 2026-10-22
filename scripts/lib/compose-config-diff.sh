@@ -1,20 +1,16 @@
 #!/usr/bin/env bash
 # Renders two Compose configurations as JSON and compares a jq path between
-# them. Used by CI/mise validate to prove two configurations only differ the
-# way they're supposed to - e.g. that docker-compose.http.yml's
-# --providers.docker.defaultrule argument matches docker-compose.yml's
-# byte-for-byte, or that an override file changes exactly the fields it
-# claims to.
+# them. `mise run validate` (locally and in CI) uses it to prove that
+# docker-compose.http.yml's --providers.docker.defaultrule argument matches
+# docker-compose.yml's byte-for-byte.
 #
 # Usage:
 #   compose-config-diff.sh <jq-path> -- <compose-args-A...> -- <compose-args-B...>
 #
 # Prints the extracted value from each configuration, then a diff between
 # them. Exits 0 if the two extracted values are byte-identical, 1 otherwise.
-# For comparisons that need something other than exact equality (e.g. "these
-# two command lists must differ by exactly these 3 known entries"), source
-# this file's render_config_json function directly instead of relying on the
-# exit code.
+# Callers that need more than exact equality can source this file for
+# render_config_json instead of relying on the exit code.
 #
 # Requires: docker compose (with `config --format json` support), jq on PATH.
 
@@ -22,7 +18,7 @@ set -euo pipefail
 
 # render_config_json <compose-args...>
 # Renders a Compose configuration as JSON. Intended to be sourced by callers
-# that need more than an equality check (see phase 7's redirect parity test).
+# that need more than an equality check.
 render_config_json() {
   docker compose "$@" config --format json
 }

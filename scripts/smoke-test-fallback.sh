@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
 # Live smoke test for hostname fallback. Confirms, against a real running
-# Traefik, the exact resolution order documented in README "Adding a
-# service": traefik.hostname label (always wins) -> Compose service name if
-# enabled -> container name if enabled -> no route. Also confirms fallback
-# hostnames are normalized (underscores become hyphens) while an explicit
-# label is used exactly as written.
+# Traefik, the exact resolution order documented in "Adding a service" in
+# docs/runtime/connecting-services.md: traefik.hostname label (always wins)
+# -> Compose service name if enabled -> container name if enabled -> no
+# route. Also confirms fallback hostnames are normalized (underscores become
+# hyphens) while an explicit label is used exactly as written.
 
 set -euo pipefail
 

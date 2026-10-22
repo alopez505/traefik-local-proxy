@@ -30,7 +30,8 @@
 services:
   proxy:
     # Deliberately pinned and tested here, not an arbitrary version. Bump only
-    # after `mise run validate` and `mise run smoke` pass against the new tag.
+    # after `mise run validate`, `mise run smoke`, and `mise run smoke-fallback`
+    # pass against the new tag.
     image: traefik:v3.7.14
     container_name: proxy
     restart: unless-stopped
@@ -54,7 +55,8 @@ services:
       # -> container name if TRAEFIK_FALLBACK_TO_CONTAINER_NAME=true -> no
       # route. Fallback tiers are normalized (normalize); an explicit
       # traefik.hostname label never is. This exact string must stay
-      # identical in docker-compose.http.yml - see the CI parity check.
+      # identical in docker-compose.http.yml - see the defaultrule parity check
+      # in `mise run validate`.
       - '--providers.docker.defaultrule={{ if index .Labels "traefik.hostname" }}Host(`{{ index .Labels "traefik.hostname" }}.localtest.me`){{ else if and (eq "${TRAEFIK_FALLBACK_TO_COMPOSE_SERVICE_NAME:-false}" "true") (index .Labels "com.docker.compose.service") }}Host(`{{ normalize (index .Labels "com.docker.compose.service") }}.localtest.me`){{ else if and (eq "${TRAEFIK_FALLBACK_TO_CONTAINER_NAME:-false}" "true") (trimPrefix "/" .ContainerName) }}Host(`{{ normalize (trimPrefix "/" .ContainerName) }}.localtest.me`){{ else }}{{ end }}'
       - "--providers.docker.network=${TRAEFIK_NETWORK_NAME:-proxy}"
       - "--providers.file.directory=/etc/traefik/dynamic"
@@ -87,9 +89,11 @@ services:
       - "${TRAEFIK_WEB_BIND_ADDRESS:-127.0.0.1}:${TRAEFIK_HTTPS_PORT:-443}:443"
       # Database TCP entrypoints (Neo4j, MSSQL, MySQL, Postgres) are always
       # defined below, but only published when the matching override file is
-      # added - see docker-compose.<db>.yml and README "TCP database routing".
+      # added - see docker-compose.<db>.yml and
+      # docs/runtime/database-routing.md.
     volumes:
-      # Dynamic config (TLS certificates, extra routers)
+      # Dynamic config (TLS certificate config, backend-TLS transport,
+      # optional middlewares)
       - ./dynamic:/etc/traefik/dynamic:ro
       # Mount only the leaf certificate and key. The copied CA certificate and
       # any unrelated files in certs/ are not needed by Traefik.
