@@ -36,8 +36,8 @@ it, and Compose's `command:` key fully replaces (not merges) across `-f`
 files, so there is no way to toggle just those flags with a variable. To
 disable it, use `mise run up-without-http-to-https-redirect`, or add
 `docker-compose.disable-http-to-https-redirect.yml` to your `-f` list
-directly. A CI check keeps that file in sync with docker-compose.yml's
-command list.
+directly. A check in `mise run validate`, which CI also runs, keeps that file
+in sync with docker-compose.yml's command list.
 
 The TCP database ports are not published by default because they conflict
 with local installs of Neo4j, MSSQL, MySQL, and Postgres - each is only

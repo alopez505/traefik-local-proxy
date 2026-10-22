@@ -41,7 +41,7 @@ description = "Stop Traefik while keeping the proxy network"
 run = "docker compose stop"
 
 [tasks.restart]
-description = "Restart Traefik (use 'up' to apply config/port changes)"
+description = "Restart Traefik (use 'mise run up' or 'mise run up-http' to apply config/port changes)"
 run = "docker compose restart proxy"
 
 [tasks.logs]
@@ -98,7 +98,7 @@ description = "Validate the rendered compose config"
 run = "docker compose config -q && echo 'Config OK'"
 
 [tasks.validate]
-description = "Full local gate: pre-commit hooks + all compose configs"
+description = "Full local gate: pre-commit hooks, compose configs, parity checks, regression tests"
 run = """
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
 	echo 'Validation must run inside a git repository (.git missing). Clone the repo or run git init first.'

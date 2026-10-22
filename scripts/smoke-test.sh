@@ -54,11 +54,10 @@ demo_http() {
     -f "$ROOT_DIR/examples/whoami/docker-compose.http.yml" "$@"
 }
 
-# Fixture with no traefik.hostname label at all - characterizes today's actual
-# behavior (no route generated) so a later hostname-fallback rework can prove
-# it didn't change this case unless a fallback flag is deliberately enabled.
-# Compose service name and container name are deliberately different strings
-# so a future fallback test can tell which tier (if any) produced a route.
+# Fixture with no traefik.hostname label at all. With both hostname-fallback
+# flags at their default (false), it must get no route. Compose service name
+# and container name are deliberately different strings so the check can tell
+# which fallback tier (if any) produced a route.
 baseline_compose_yaml() {
   cat <<EOF
 services:
@@ -155,10 +154,10 @@ assert_https_mode() {
   fi
 }
 
-# Baseline characterization: a container with no traefik.hostname label gets
-# no usable route today. Neither its Compose service name nor its container
-# name should resolve to anything - both must 404, the same as any other
-# unmatched host on this entrypoint.
+# Baseline characterization: with the fallback flags at their default, a
+# container with no traefik.hostname label gets no usable route. Neither its
+# Compose service name nor its container name should resolve to anything -
+# both must 404, the same as any other unmatched host on this entrypoint.
 assert_no_route_without_hostname_label() {
   assert_status 404 "https://baselinesvc.localtest.me:$HTTPS_PORT/" \
     --insecure --resolve "baselinesvc.localtest.me:$HTTPS_PORT:127.0.0.1"

@@ -6,7 +6,7 @@
 #
 # Publishing this port only opens the entrypoint - it does not route
 # anything by itself. An actual Postgres container still needs its own TCP
-# router/service labels (see README "TCP database routing") to be reachable
+# router/service labels (see docs/runtime/database-routing.md) to be reachable
 # through it. Raw non-TLS routing supports exactly one backend per
 # entrypoint; Traefik does support routing by SNI after Postgres's own
 # STARTTLS/SSL negotiation with a compatible client sslmode, but that is

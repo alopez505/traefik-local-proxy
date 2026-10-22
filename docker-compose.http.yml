@@ -19,14 +19,14 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.allowemptyservices=true"
       # Must stay byte-identical to docker-compose.yml's defaultrule - see
-      # that file's comment and the CI parity check.
+      # that file's comment and the parity check in `mise run validate`.
       - '--providers.docker.defaultrule={{ if index .Labels "traefik.hostname" }}Host(`{{ index .Labels "traefik.hostname" }}.localtest.me`){{ else if and (eq "${TRAEFIK_FALLBACK_TO_COMPOSE_SERVICE_NAME:-false}" "true") (index .Labels "com.docker.compose.service") }}Host(`{{ normalize (index .Labels "com.docker.compose.service") }}.localtest.me`){{ else if and (eq "${TRAEFIK_FALLBACK_TO_CONTAINER_NAME:-false}" "true") (trimPrefix "/" .ContainerName) }}Host(`{{ normalize (trimPrefix "/" .ContainerName) }}.localtest.me`){{ else }}{{ end }}'
       - "--providers.docker.network=${TRAEFIK_NETWORK_NAME:-proxy}"
       - "--entrypoints.web.address=:80"
       # Single-file dynamic config, unlike the HTTPS mode's whole-directory
       # provider - HTTP-only mode has no TLS to configure, so only the
-      # backend-TLS-compatibility transport (see README "Backend TLS
-      # compatibility") is loaded here, never dynamic/tls.yml.
+      # backend-TLS-compatibility transport (see docs/runtime/backend-tls.md)
+      # is loaded here, never dynamic/tls.yml.
       - "--providers.file.filename=/etc/traefik/dynamic/serverstransport.yml"
       - "--providers.file.watch=true"
     depends_on:

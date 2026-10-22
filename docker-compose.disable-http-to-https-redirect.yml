@@ -6,9 +6,10 @@
 # include this file based on an env var's value). Compose's `command:` key
 # fully replaces across -f files rather than merging, so this file restates
 # the entire command list from docker-compose.yml, minus exactly the 3
-# redirect lines. A CI check renders both configurations and asserts the
-# only difference is those 3 entries, to catch this file silently drifting
-# out of sync with a future edit to docker-compose.yml's command list.
+# redirect lines. scripts/test-redirect-override-parity.sh (run by
+# `mise run validate`, locally and in CI) renders both configurations and
+# asserts the only difference is those 3 entries, to catch this file silently
+# drifting out of sync with a future edit to docker-compose.yml's command list.
 #
 # Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.disable-http-to-https-redirect.yml up -d
