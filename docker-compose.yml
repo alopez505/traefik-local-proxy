@@ -32,7 +32,7 @@ services:
     # Deliberately pinned and tested here, not an arbitrary version. Bump only
     # after `mise run validate`, `mise run smoke`, and `mise run smoke-fallback`
     # pass against the new tag.
-    image: traefik:v3.7.14
+    image: traefik:v3.7.15
     container_name: proxy
     restart: unless-stopped
     # Traefik treats file, CLI, and environment install configuration as
