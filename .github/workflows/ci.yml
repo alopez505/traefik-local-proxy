@@ -25,7 +25,7 @@ jobs:
       # sha256 input - supplying one makes the action skip its own
       # minisign-signed SHASUMS256.txt check, which is the stronger verify.
       - name: Install mise and pinned tools
-        uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+        uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
         with:
           version: 2026.10.11
 
@@ -103,7 +103,7 @@ jobs:
       # Same pinned gitleaks as the pre-commit hook: version in mise.toml, URL and
       # checksum in mise.lock.
       - name: Install mise and pinned tools
-        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
         with:
           version: 2026.10.11
 
